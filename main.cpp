@@ -33,12 +33,14 @@ int rand_int(int lower, int upper) {
 
 class node{
 public:
+    node* father;
     node* left;
     node* right;
     int type;
     int size;
     string symbol;
-    explicit node(node* l = nullptr, node* r = nullptr, int si = 1, int tp = 0, string sym = ""){
+    explicit node(node* fa = nullptr, node* l = nullptr, node* r = nullptr, int si = 1, int tp = 0, string sym = ""){
+        father = fa;
         left = l;
         right = r;
         size = si;
@@ -74,9 +76,15 @@ public:
     }
 
     static node* tree_cpy(node* obj){
-        node* now = new node(nullptr, nullptr, obj->size, obj->type, obj->symbol);
-        if (obj->left != nullptr) now->left = tree_cpy(obj->left);
-        if (obj->right != nullptr) now->right = tree_cpy(obj->right);
+        node* now = new node(nullptr, nullptr, nullptr, obj->size, obj->type, obj->symbol);
+        if (obj->left != nullptr) {
+            now->left = tree_cpy(obj->left);
+            now->left->father = now;
+        }
+        if (obj->right != nullptr) {
+            now->right = tree_cpy(obj->right);
+            now->right->father = now;
+        }
         return now;
     }
 
@@ -100,9 +108,11 @@ public:
             }
         }
         now->left = expand(type, depth + 1, max_depth);
+        now->left->father = now;
+        now->size += (now->left)->size;
         now->right = expand(type,depth + 1, max_depth);
-        if (now->left != nullptr) now->size += (now->left)->size;
-        if (now->right != nullptr) now->size += (now->right)->size;
+        now->right->father = now;
+        now->size += (now->right)->size;
         return now;
     }
 
@@ -122,7 +132,7 @@ public:
         }
     }
 
-    static double cal_fitness(const individual indi, int num,  double** xx, double* yy){
+    static double cal_fitness(const individual& indi, int num,  double** xx, double* yy){
         double fitness = 0;
         for (int i = 0; i < num; i++)
             fitness += abs(calculate(indi.root, xx[i]) - yy[i]);
@@ -134,25 +144,77 @@ public:
         cout << now << " " << now->symbol << " " << now->left << " " << now->right << endl;
         show(now->left);
         show(now->right);
-   }
+    }
 
-
-   static void in_order(node* now, node* seq, int &num) {
+    static void in_order(node* now, node** seq, int &num) {
         if (now->left != nullptr) in_order(now->left, seq, num);
-        seq[num++] = *now;
+        seq[num++] = now;
         if (now->left != nullptr) in_order(now->right, seq, num);
     }
 
-   void crossover(individual* another){
-       int cnt = 0;
-       auto seq1 = new node [root->size];
-       in_order(root, seq1, cnt);
-       cnt = 0;
-       auto seq2 = new node [another->root->size];
-       in_order(another->root, seq2, cnt);
+    static void size_update(node* now) {
+        if (now == nullptr) return;
+        now->size = now->left->size + now->right->size + 1;
+        size_update(now->father);
+    }
 
-       delete [] seq1;
-       delete [] seq2;
+    void crossover(individual* another){
+        int cnt = 0;
+        auto seq1 = new node* [root->size];
+        in_order(root, seq1, cnt);
+        cnt = 0;
+        auto seq2 = new node* [another->root->size];
+        in_order(another->root, seq2, cnt);
+
+        node* cross_node1 = seq1[rand_int(0, root->size)];
+        node* cross_node2 = seq2[rand_int(0, another->root->size)];
+
+        if (cross_node1->father->left == cross_node1)
+            cross_node1->father->left = cross_node2;
+        else
+            cross_node1->father->right = cross_node2;
+
+        if (cross_node2->father->left == cross_node2)
+            cross_node2->father->left = cross_node1;
+        else
+            cross_node2->father->right = cross_node1;
+
+        swap(cross_node1->father, cross_node2->father);
+
+        size_update(cross_node1->father);
+        size_update(cross_node2->father);
+
+        delete [] seq1;
+        delete [] seq2;
+    }
+
+    static int cal_depth(node* now){
+        if (now == nullptr) return 1;
+        return cal_depth(now->father) + 1;
+    }
+
+    static void mutation(node* root){
+        int cnt = 0;
+        auto seq1 = new node* [root->size];
+        in_order(root, seq1, cnt);
+        node* mutation_node = seq1[rand_int(0, root->size)];
+
+        int depth = cal_depth(mutation_node->father);
+
+        string type;
+        if (dis(mt) < 0.5)
+            type = "grow";
+        else
+            type = "full";
+
+        if (mutation_node->left == mutation_node)
+            mutation_node->father->left = expand(type, depth, MAX_DEPTH);
+        else
+            mutation_node->father->right = expand(type, depth, MAX_DEPTH);
+
+        size_update(mutation_node->father);
+
+        clean(mutation_node);
     }
 
    // free pointer
@@ -188,49 +250,59 @@ int main() {
     }
 
     //Initialize
-    auto pop = new individual [POP_SIZE];
+    auto pop = new individual* [POP_SIZE];
     for (int md = MIN_DEPTH; md <= MAX_DEPTH; md++) {
-        for (int i = 0; i < TYPE_NUM; i++)
-            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + i].build("grow", md);
-        for (int i = 0; i < TYPE_NUM; i++)
-            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + TYPE_NUM + i].build("full", md);
+        for (int i = 0; i < TYPE_NUM; i++) {
+            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + i] = new individual();
+            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + i]->build("grow", md);
+        }
+        for (int i = 0; i < TYPE_NUM; i++) {
+            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + TYPE_NUM + i] = new individual();
+            pop[TYPE_NUM * 2 * (md - MIN_DEPTH) + TYPE_NUM + i]->build("full", md);
+        }
     }
 
     //Display the tree
     for (int i = 0; i < POP_SIZE; i++) {
         cout << "ID: " << i << endl;
-        individual::show(pop[i].root);
+        individual::show(pop[i]->root);
     }
 
     //Calculate fitness
     double fitness[POP_SIZE];
     for (int i = 0; i < POP_SIZE; i++) {
-        fitness[i] = individual::cal_fitness(pop[i], n, train_x, train_y);
+        fitness[i] = individual::cal_fitness(*(pop[i]), n, train_x, train_y);
         cout << "ID: " << i << " " << fitness[i] << endl;
     }
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
+        auto new_pop = new individual* [POP_SIZE];
         for (int i = 0; i < POP_SIZE; i++) {
             int index_p1 = sample(fitness);
             int index_p2 = sample(fitness);
-            auto parent1 = new individual(pop[index_p1]);
-            auto parent2 = new individual(pop[index_p2]);
+            auto parent1 = new individual(*pop[index_p1]);
+            auto parent2 = new individual(*pop[index_p2]);
             parent1->crossover(parent2);
-
-            individual::clean(parent1->root);
+            individual::mutation(parent1->root);
+            new_pop[i] = parent1;
             individual::clean(parent2->root);
         }
+        swap(pop, new_pop);
+
+        // free pointer;
+        for (int i = 0; i < POP_SIZE; i++)
+            individual::clean(new_pop[i]->root);
+        delete [] new_pop;
     }
 
     // free pointer
     for (int i = 0; i < POP_SIZE; i++)
-        individual::clean(pop[i].root);
+        individual::clean(pop[i]->root);
     delete [] pop;
     delete [] train_y;
     for (int i = 0; i < n; i++)
         delete [] train_x[i];
     delete [] train_x;
-
 }
 
