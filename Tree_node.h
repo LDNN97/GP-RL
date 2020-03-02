@@ -7,8 +7,6 @@
 
 #include <string>
 
-using namespace std;
-
 class node{
 public:
     node* father;
@@ -17,8 +15,8 @@ public:
     int type;
     int size;
     std::string symbol;
-    explicit node(node* fa = nullptr, node* l = nullptr, node* r = nullptr, int si = 1, int tp = 0, string sym = "");
-    void set_symbol(int tp, string ty);
+    explicit node(node* fa = nullptr, node* l = nullptr, node* r = nullptr, int si = 1, int tp = 1, std::string sym = "");
+    void set_symbol(int tp, std::string ty);
     double cal(double l, double r, const double* xx);
 };
 

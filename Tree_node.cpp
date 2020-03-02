@@ -4,6 +4,8 @@
 
 #include "Tree_node.h"
 
+using namespace std;
+
 node::node(node* fa, node* l, node* r, int si, int tp, string sym){
     father = fa;
     left = l;
@@ -23,6 +25,6 @@ double node::cal(double l, double r, const double* xx){
     if (symbol == "+") ans = l + r;
     if (symbol == "-") ans = l - r;
     if (symbol == "*") ans = l * r;
-    if (symbol == "x0") ans = xx[0];
+    if (symbol == "1") ans = xx[0];
     return ans;
 }

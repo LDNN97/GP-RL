@@ -4,6 +4,8 @@
 
 #include "Individual.h"
 
+using namespace std;
+
 individual::individual(node* pt){
     root = pt;
 }
@@ -35,7 +37,7 @@ node* individual::tree_cpy(node* obj){
         now->set_symbol(1, terminal_node[tmp]);
         return now;
     } else {
-        if (dis(mt) < 0.5) {
+        if (rand_real(0, 1) < 0.5) {
             int tmp = rand_int(0, n_f);
             now->set_symbol(0, function_node[tmp]);
         }else{
@@ -54,7 +56,7 @@ node* individual::tree_cpy(node* obj){
 }
 
 void individual::build(const string &type, int max_depth){
-    root = expand(type, 0, max_depth);
+    root = expand(type, 1, max_depth);
 }
 
 double individual::calculate(node* now, double* xx) {
@@ -76,11 +78,65 @@ double individual::cal_fitness(const individual& indi, int num,  double** xx, do
     return fitness;
 }
 
-void individual::show(node* now){
-    if (now == nullptr) return;
-    cout << now << " " << now->symbol << " " << now->left << " " << now->right << endl;
-    show(now->left);
-    show(now->right);
+
+
+void individual::show(node* now, vector<item>** pic, int* pos, int depth, int Max_depth){
+    if (now->type == 1) {
+        pic[depth - 1]->push_back(item(pos[depth - 1], now->symbol));
+        int number = 1 << (Max_depth - depth);
+        for (int i = depth - 1; i < Max_depth; i++)
+            pos[i] += number;
+        return;
+    }
+
+    pic[depth - 1]->push_back(item(pos[depth - 1], now->symbol));
+    int number = 1 << (Max_depth - depth);
+    pos[depth - 1] += number;
+
+    show(now->left, pic, pos, depth + 1, Max_depth);
+    show(now->right, pic, pos, depth + 1, Max_depth);
+}
+
+int individual::max_depth(node* now) {
+    if (now == nullptr) return 0;
+    int l_depth = max_depth(now->left);
+    int r_depth = max_depth(now->right);
+    return max(l_depth, r_depth) + 1;
+}
+
+void individual::print_tree(individual* indi){
+    int Max_depth = max_depth(indi->root);
+
+    int pos[Max_depth];
+    memset(pos, 0, sizeof(pos));
+    auto pic = new vector<item>* [Max_depth];
+    for (int i = 0; i < Max_depth; i++)
+        pic[i] = new vector<item>;
+
+    individual::show(indi->root, pic, pos, 1, Max_depth);
+
+    for (int i = 0; i < Max_depth; i++) {
+        if (pic[i]->size() == 1) {
+            if ((*pic[i])[0].first > 0)
+                for (int k = 0; k < (*pic[i])[0].first; k++) cout << " ";
+            cout << (*pic[i])[0].second << endl;
+        } else{
+            int last = int(pic[i]->size()) - 1;
+            for (int j = 0; j < last; j++) {
+                if (j == 0 && (*pic[i])[j].first > 0)
+                    for (int k = 0; k < (*pic[i])[j].first; k++) cout << " ";
+                cout << (*pic[i])[j].second;
+                int whitespace_number = (*pic[i])[j + 1].first - (*pic[i])[j].first - 1;
+                for (int k = 0; k < whitespace_number; k++) cout << " ";
+            }
+            cout << (*pic[i])[last].second << endl;
+        }
+
+    }
+
+    for (int i = 0; i < Max_depth; i++)
+        delete pic[i];
+    delete [] pic;
 }
 
 void individual::in_order(node* now, node** seq, int &num) {
@@ -95,8 +151,11 @@ void individual::size_update(node* now) {
     size_update(now->father);
 }
 
+
 void individual::crossover(individual* another){
-    if (dis(mt) > C_P) return;
+    if (rand_real(0, 1) > C_P) return;
+
+    cout << "Crossover!" << endl;
 
     int cnt = 0;
     auto seq1 = new node* [root->size];
@@ -105,23 +164,62 @@ void individual::crossover(individual* another){
     auto seq2 = new node* [another->root->size];
     in_order(another->root, seq2, cnt);
 
+    cout << "parent1: " << endl;
+    for (int i = 0; i < root->size; i++)
+        cout << i << " " << seq1[i] << endl;
+    cout << "parent2: " << endl;
+    for (int i = 0; i < another->root->size; i++)
+        cout << i << " " << seq2[i] << endl;
+
     node* cross_node1 = seq1[rand_int(0, root->size)];
     node* cross_node2 = seq2[rand_int(0, another->root->size)];
 
-    if (cross_node1->father->left == cross_node1)
-        cross_node1->father->left = cross_node2;
-    else
-        cross_node1->father->right = cross_node2;
+    cout << "parent1 crossover point: " << endl;
+    cout << cross_node1 << endl;
+    cout << "parent2 crossover point: " << endl;
+    cout << cross_node2 << endl;
 
-    if (cross_node2->father->left == cross_node2)
-        cross_node2->father->left = cross_node1;
-    else
-        cross_node2->father->right = cross_node1;
+    if (cross_node1->father == nullptr && cross_node2->father == nullptr) {
+        swap(cross_node1, cross_node2);
+        swap(root, another->root);
+    }else if (cross_node1->father == nullptr) {
+        if (cross_node2->father->left == cross_node2)
+            cross_node2->father->left = cross_node1;
+        else
+            cross_node2->father->right = cross_node1;
+        cross_node1->father = cross_node2->father;
+        cross_node2->father = nullptr;
+        root = cross_node2;
+    }else if (cross_node2->father == nullptr) {
+        if (cross_node1->father->left == cross_node1)
+            cross_node1->father->left = cross_node2;
+        else
+            cross_node1->father->right = cross_node2;
+        cross_node2->father = cross_node1->father;
+        cross_node1->father = nullptr;
+        another->root = cross_node1;
+    }else {
+        if (cross_node1->father->left == cross_node1)
+            cross_node1->father->left = cross_node2;
+        else
+            cross_node1->father->right = cross_node2;
+        if (cross_node2->father->left == cross_node2)
+            cross_node2->father->left = cross_node1;
+        else
+            cross_node2->father->right = cross_node1;
+        swap(cross_node1->father, cross_node2->father);
+    }
 
-    swap(cross_node1->father, cross_node2->father);
+    cout << "parent1 tree size and cross_node1 subtree size" << endl;
+    cout << root->size << " " << cross_node1->size << endl;
+    cout << "parent2 tree size and cross_node2 subtree size" << endl;
+    cout << another->root->size << " " << cross_node2->size << endl;
 
     size_update(cross_node1->father);
     size_update(cross_node2->father);
+
+    cout << "parent1 tree size: " << root->size << endl;
+    cout << "parent2 tree size: " << another->root->size << endl;
 
     delete [] seq1;
     delete [] seq2;
@@ -133,7 +231,7 @@ int individual::cal_depth(node* now){
 }
 
 void individual::mutation(node* root){
-    if (dis(mt) > M_P) return;
+    if (rand_real(0, 1) > M_P) return;
 
     int cnt = 0;
     auto seq1 = new node* [root->size];
@@ -143,7 +241,7 @@ void individual::mutation(node* root){
     int depth = cal_depth(mutation_node->father);
 
     string type;
-    if (dis(mt) < 0.5)
+    if (rand_real(0, 1) < 0.5)
         type = "grow";
     else
         type = "full";
@@ -156,6 +254,8 @@ void individual::mutation(node* root){
     size_update(mutation_node->father);
 
     clean(mutation_node);
+
+    delete [] seq1;
 }
 
 // free pointer

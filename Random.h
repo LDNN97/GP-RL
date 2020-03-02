@@ -7,13 +7,7 @@
 
 #include <random>
 
-using namespace std;
-
-mt19937 mt(0); // seed()
-uniform_real_distribution<double> dis(0, 1);
-
-int rand_int(int lower, int upper) {
-    return lower + int(dis(mt) * double(upper - lower));
-}
+int rand_int(int lower, int upper);
+double rand_real(double lower, double upper);
 
 #endif //GP_CPP_RANDOM_H
