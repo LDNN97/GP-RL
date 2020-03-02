@@ -31,7 +31,7 @@ public:
     static int max_depth(node* now);
     void crossover(individual* another);
     static int cal_depth(node* now);
-    static void mutation(node* root);
+    static void mutation(individual* indi);
     // free pointer
     static void clean(node* now);
 };
