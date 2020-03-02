@@ -247,12 +247,13 @@ void individual::mutation(individual* indi){
     node* mutation_node = seq1[rand_int(0, indi->root->size)];
 
     int depth = cal_depth(mutation_node);
-    int sub_tree_depth = max_depth(mutation_node);
+//    int sub_tree_depth = max_depth(mutation_node);
+    int sub_tree_depth = MUT_DEPTH;
 
-    cout << depth << " " << sub_tree_depth << endl;
+//    cout << depth << " " << sub_tree_depth << endl;
 
     string type;
-    if (rand_real(0, 1) < 0)
+    if (rand_real(0, 1) < 0.9)
         type = "grow";
     else
         type = "full";

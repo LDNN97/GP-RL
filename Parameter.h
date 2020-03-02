@@ -9,10 +9,11 @@
 
 const int MIN_DEPTH = 3;
 const int INI_DEPTH = 5;
-const int MAX_GENERATION = 5;
+const int MUT_DEPTH = 3;
+const int MAX_GENERATION = 1000;
 const int T_S = 5; // Tournament Size
-const double C_P = 1; // Crossover Probability
-const double M_P = 1; // Mutation Probability
+const double C_P = 0.5; // Crossover Probability
+const double M_P = 0.2; // Mutation Probability
 const int TYPE_NUM = 5;
 const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;
 

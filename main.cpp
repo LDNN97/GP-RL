@@ -72,11 +72,18 @@ int main() {
         }
         cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
         cout << "Best Fitness: " << fitness[best_indi] << endl;
-        individual::print_tree(pop[best_indi]);
+        cout << "Tree Size: " << pop[best_indi]->root->size << endl;
+//        individual::print_tree(pop[best_indi]);
+
+        if (fitness[best_indi] < 1e-3) {
+            cout << "=====successfully!======" << endl;
+            cout << endl;
+            break;
+        }
 
         for (int i = 0; i < POP_SIZE; i++) {
 
-            cout << "evolution episodic: " << i << endl;
+//            cout << "evolution episodic: " << i << endl;
 
             int index_p1 = sample(fitness);
             int index_p2 = sample(fitness);
@@ -85,32 +92,32 @@ int main() {
 
 //            cout << "parent1 ID and address" << endl;
 //            cout << index_p1 << " " << pop[index_p1] << endl;
-            cout << "parent1 tree: " << endl;
-            individual::print_tree(pop[index_p1]);
+//            cout << "parent1 tree: " << endl;
+//            individual::print_tree(pop[index_p1]);
 //            cout << "parent2 ID and address" << endl;
 //            cout << index_p2 << " " << pop[index_p2] << endl;
-            cout << "parent2 tree: " << endl;
-            individual::print_tree(pop[index_p2]);
+//            cout << "parent2 tree: " << endl;
+//            individual::print_tree(pop[index_p2]);
 
             parent1->crossover(parent2);
 
-            cout << "crossover result" << endl;
-            cout << "parent1: " << parent1->root << endl;
-            individual::print_tree(parent1);
-            cout << "parent2: " << parent2->root << endl;
-            individual::print_tree(parent2);
+//            cout << "crossover result" << endl;
+//            cout << "parent1: " << parent1->root << endl;
+//            individual::print_tree(parent1);
+//            cout << "parent2: " << parent2->root << endl;
+//            individual::print_tree(parent2);
 
             individual::mutation(parent1);
 
-            cout << "mutation result" << endl;
-            cout << "parent1: " << parent1->root << endl;
-            individual::print_tree(parent1);
+//            cout << "mutation result" << endl;
+//            cout << "parent1: " << parent1->root << endl;
+//            individual::print_tree(parent1);
 
             new_pop[i] = parent1;
             individual::clean(parent2->root);
             delete parent2;
 
-            cout << endl;
+//            cout << endl;
         }
 
 //        cout << "old population" << endl;
@@ -145,7 +152,8 @@ int main() {
     }
     cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
     cout << "Best Fitness: " << fitness[best_indi] << endl;
-    individual::print_tree(pop[best_indi]);
+//    individual::print_tree(pop[best_indi]);
+//    individual::print_tree(pop[best_indi]);
 
     // free pointer
     for (int i = 0; i < POP_SIZE; i++) {
