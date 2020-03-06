@@ -18,9 +18,9 @@ const int TYPE_NUM = 5;
 const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;
 
 // node
-const int n_f = 3;
-const std::string function_node[3]{"+", "-", "*"};
-const int n_t = 1;
-const std::string terminal_node[1]{"1"};
+const int n_f = 4;
+const std::string function_node[n_f]{"+", "-", "*", "/"};
+const int n_t = 4;
+const std::string terminal_node[n_f]{"1", "2", "3", "4"};
 
 #endif //GP_CPP_PARAMETER_H

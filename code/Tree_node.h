@@ -6,6 +6,7 @@
 #define GP_CPP_TREE_NODE_H
 
 #include <string>
+#include <cmath>
 
 class node{
 public:

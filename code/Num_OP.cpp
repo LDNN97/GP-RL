@@ -1,25 +1,21 @@
-#include <iostream>
-#include "Parameter.h"
-#include "Random.h"
-#include "Individual.h"
+//
+// Created by LDNN97 on 2020/3/6.
+//
+#include "Num_OP.h"
 
 using namespace std;
 
-int sample(const double * fitness){
+int num::sample(const double * fitness){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
         int tmp = rand_int(0, POP_SIZE);
-
-//        cout << "compare: " << ans << " VS " << tmp << endl;
-//        cout << "fitness: " << fitness[ans] << " VS " << fitness[tmp] << endl;
-
         ans = (fitness[ans] < fitness[tmp]) ? ans : tmp;
     }
     return ans;
 }
 
-int main() {
-    freopen("train_data.txt", "r", stdin);
+void num::num_op(){
+    FILE* file = freopen("train_data.txt", "r", stdin);
     int n, n_x;
     cin >> n >> n_x;
     auto train_x = new double* [n];
@@ -45,14 +41,6 @@ int main() {
         }
     }
 
-    // Display the tree
-//    for (int i = 0; i < POP_SIZE; i++) {
-//        if (i == 22)
-//            cout << "Break" << endl;
-//        cout << i << " " << pop[i] << endl;
-//        individual::print_tree(pop[i]);
-//    }
-
     //fitness
     double fitness[POP_SIZE];
     double total;
@@ -68,12 +56,10 @@ int main() {
             fitness[i] = individual::cal_fitness(*(pop[i]), n, train_x, train_y);
             total += fitness[i];
             best_indi = (fitness[best_indi] < fitness[i]) ? best_indi : i;
-//            cout << "ID: " << i << " " << fitness[i] << endl;
         }
         cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
         cout << "Best Fitness: " << fitness[best_indi] << endl;
         cout << "Tree Size: " << pop[best_indi]->root->size << endl;
-//        individual::print_tree(pop[best_indi]);
 
         if (fitness[best_indi] < 1e-3) {
             cout << "=====successfully!======" << endl;
@@ -82,57 +68,18 @@ int main() {
         }
 
         for (int i = 0; i < POP_SIZE; i++) {
-
-//            cout << "evolution episodic: " << i << endl;
-
             int index_p1 = sample(fitness);
             int index_p2 = sample(fitness);
             auto parent1 = new individual(*pop[index_p1]);
             auto parent2 = new individual(*pop[index_p2]);
 
-//            cout << "parent1 ID and address" << endl;
-//            cout << index_p1 << " " << pop[index_p1] << endl;
-//            cout << "parent1 tree: " << endl;
-//            individual::print_tree(pop[index_p1]);
-//            cout << "parent2 ID and address" << endl;
-//            cout << index_p2 << " " << pop[index_p2] << endl;
-//            cout << "parent2 tree: " << endl;
-//            individual::print_tree(pop[index_p2]);
-
             parent1->crossover(parent2);
-
-//            cout << "crossover result" << endl;
-//            cout << "parent1: " << parent1->root << endl;
-//            individual::print_tree(parent1);
-//            cout << "parent2: " << parent2->root << endl;
-//            individual::print_tree(parent2);
-
             individual::mutation(parent1);
-
-//            cout << "mutation result" << endl;
-//            cout << "parent1: " << parent1->root << endl;
-//            individual::print_tree(parent1);
 
             new_pop[i] = parent1;
             individual::clean(parent2->root);
             delete parent2;
-
-//            cout << endl;
         }
-
-//        cout << "old population" << endl;
-//        for (int i = 0; i < POP_SIZE; i++)
-//            cout << pop[i] << endl;
-//        cout << "new population" << endl;
-//        for (int i = 0; i < POP_SIZE; i++)
-//            cout << new_pop[i] << endl;
-        swap(pop, new_pop);
-//        cout << "old population" << endl;
-//        for (int i = 0; i < POP_SIZE; i++)
-//            cout << pop[i] << endl;
-//        cout << "new population" << endl;
-//        for (int i = 0; i < POP_SIZE; i++)
-//            cout << new_pop[i] << endl;
 
         // free pointer;
         for (int i = 0; i < POP_SIZE; i++) {
@@ -148,12 +95,28 @@ int main() {
         fitness[i] = individual::cal_fitness(*(pop[i]), n, train_x, train_y);
         total += fitness[i];
         best_indi = (fitness[best_indi] < fitness[i]) ? best_indi : i;
-//            cout << "ID: " << i << " " << fitness[i] << endl;
     }
     cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
     cout << "Best Fitness: " << fitness[best_indi] << endl;
-//    individual::print_tree(pop[best_indi]);
-//    individual::print_tree(pop[best_indi]);
+
+    // test
+    cin >> n >> n_x;
+    cout << n << n_x;
+    auto test_x = new double* [n];
+    auto test_y = new double [n];
+
+    for (int i = 0; i < n; i++) {
+        test_x[i] = new double [n_x];
+        for (int j = 0; j < n_x; j++)
+            cin >> test_x[i][j];
+        cin >> test_y[i];
+        cout << individual::calculate(pop[best_indi]->root, test_x[i]) << " " << test_y[i] << endl;
+    }
+
+    delete [] test_y;
+    for (int i = 0; i < n; i++)
+        delete [] test_x[i];
+    delete [] test_x;
 
     // free pointer
     for (int i = 0; i < POP_SIZE; i++) {
@@ -168,4 +131,3 @@ int main() {
         delete [] train_x[i];
     delete [] train_x;
 }
-

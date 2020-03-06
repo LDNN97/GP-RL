@@ -25,6 +25,10 @@ double node::cal(double l, double r, const double* xx){
     if (symbol == "+") ans = l + r;
     if (symbol == "-") ans = l - r;
     if (symbol == "*") ans = l * r;
+    if (symbol == "/") ans = (abs(r) < 0.001) ? l : l/r;
     if (symbol == "1") ans = xx[0];
+    if (symbol == "2") ans = xx[1];
+    if (symbol == "3") ans = xx[2];
+    if (symbol == "4") ans = xx[3];
     return ans;
 }
