@@ -14,10 +14,17 @@
 #include <pybind11/numpy.h>
 
 namespace rl{
+    struct rec{
+        int a;
+        double v;
+    };
+
     void env_reset(pybind11::object &env, double* st);
     void env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end);
+    rec get_max_action(pybind11::object &env, individual* indi);
+    double cal_target(pybind11::object &env, individual* lgbi);
     int sample(const double * fitness);
-    int get_max_action(double* st);
+
     void rl_op();
 }
 

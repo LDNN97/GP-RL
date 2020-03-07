@@ -81,6 +81,8 @@ void num::num_op(){
             delete parent2;
         }
 
+        swap(pop, new_pop);
+
         // free pointer;
         for (int i = 0; i < POP_SIZE; i++) {
             individual::clean(new_pop[i]->root);

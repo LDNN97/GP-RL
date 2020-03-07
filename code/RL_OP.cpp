@@ -2,15 +2,10 @@
 // Created by LDNN97 on 2020/3/5.
 //
 
-// state -> action -> model
-// model -> reward -> improve action
-// sample many steps -> state + a => GP => fitness ~> evaluation  -> step sample action select the best
-
-// interface reset(state_space, action_space), act(state) -> action, update(reward)
-
 #include "RL_OP.h"
 
 namespace py = pybind11;
+using namespace std;
 
 void rl::env_reset(py::object &env, double* st){
     py::object st_or = env.attr("reset")();
@@ -26,6 +21,28 @@ void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, 
     end = py::cast<bool>(nst_or[2]);
 }
 
+rl::rec rl::get_max_action(py::object &env, individual* indi){
+    double nst[4]; double reward = 0; bool end = false;
+    double max_v = 0; int max_act = 0; double v = 0;
+    for (int i = 0; i <= 1; i++){
+        rl::env_step(env, i, nst, reward, end);
+        v = reward + 0.9 * individual::calculate(indi->root, nst);
+        if (v > max_v) {
+            max_v = v;
+            max_act = i;
+        }
+        env.attr("back_step")();
+    }
+    rl::rec ans{};
+    ans.a = max_act; ans.v = max_v;
+    return ans;
+}
+
+double rl::cal_target(pybind11::object &env, individual* lgbi){
+    rec act = rl::get_max_action(env, lgbi);
+    return act.v;
+}
+
 int rl::sample(const double * fitness){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
@@ -33,10 +50,6 @@ int rl::sample(const double * fitness){
         ans = (fitness[ans] < fitness[tmp]) ? ans : tmp;
     }
     return ans;
-}
-
-int rl::get_max_action(double* st){
-
 }
 
 void rl::rl_op() {
@@ -63,27 +76,113 @@ void rl::rl_op() {
     double total;
     int best_indi;
 
-    auto ini_st = new double [4]; auto st = new double [4]; auto nst = new double [4];
-    double reward; bool end;
-    individual** old_pop;
+    auto st = new double [4]; auto nst = new double [4];
+    rec action{}; double reward; bool end;
+    individual* lgbi;
 
-    //Todo: 1. best individual in ini_pop. 2. crossover and mutation
-
-    for (int gen = 0; gen < MAX_GENERATION; gen ++) {
-        old_pop = pop;
-        rl::env_reset(env, ini_st);
-        for (int i = 0; i < POP_SIZE; i++) {
-            //Todo: computate value using gp_tree in the last generation V_target(x) = r + a * V'(f(x, a))
-            std::memcpy(st, ini_st, sizeof(*ini_st));  // ?
-            for (int step = 0; step < 20; step++){
-                // epsilon-greedy
-                int action = get_max_action(st);
-                action = (rand_real(0, 1) < 0.2) ? rand_int(0, 2) : action;
-                rl::env_step(env, action, nst, reward, end);
-                std::swap(st, nst);
-            }
-            //Todo: fitness = 1/20 * sum((V_target(x) - V_eolved(x))^2)
+    //Best individual in ini_pop
+    env.attr("reset_ini")();
+    best_indi = 0;
+    memset(fitness, 0, sizeof(fitness));
+    for (int i = 0; i < POP_SIZE; i++) {
+        rl::env_reset(env, st);
+        for (int step = 0; step < 100; step++){
+            action = get_max_action(env, pop[i]);
+            rl::env_step(env, action.a, nst, reward, end);
+            if (end) break;
+            fitness[i] += reward;
         }
+        cout << i << " " << fitness[i] << endl;
+        best_indi = (fitness[best_indi] >= fitness[i]) ? best_indi : i;
     }
+    cout << best_indi << endl;
+    lgbi = new individual(*pop[best_indi]);
+
+//    return;
+    //Evolution
+    for (int gen = 0; gen < MAX_GENERATION; gen++) {
+        std::cout << "Generation: " << gen << std::endl;
+        env.attr("reset_ini")();
+
+        auto new_pop = new individual* [POP_SIZE];
+
+        total = 0; best_indi = 0;
+        memset(fitness, 0, sizeof(fitness));
+        for (int i = 0; i < POP_SIZE; i++) {
+            env_reset(env, st);
+            int cnt = 0;
+            for (int step = 0; step < 200; step++){
+                double target = rl::cal_target(env, lgbi);
+                double evolved = individual::calculate(pop[i]->root, st);
+                fitness[i] += (target - evolved) * (target - evolved);
+                cnt++;
+
+                action = get_max_action(env, pop[i]);
+                rl::env_step(env, action.a, nst, reward, end);
+                std::swap(st, nst);
+                if (end) break;
+            }
+            fitness[i] /= double(cnt);
+            cout << i << " " << fitness[i] << endl;
+            total += fitness[i];
+            best_indi = (fitness[best_indi] <= fitness[i]) ? best_indi : i;
+        }
+
+        delete lgbi;
+        lgbi = new individual(*pop[best_indi]);
+
+        cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
+        cout << "Best Fitness: " << fitness[best_indi] << endl;
+        cout << "Tree Size: " << pop[best_indi]->root->size << endl;
+
+        double total_reward = 0;
+        rl::env_reset(env, st);
+        for (int step = 0; step < 200; step++){
+            action = get_max_action(env, lgbi);
+            rl::env_step(env, action.a, nst, reward, end);
+            if (end) break;
+            total_reward += reward;
+        }
+        cout << "Reward: " << total_reward << endl;
+
+        if (total / double(POP_SIZE) < 1e-3) {
+            cout << "=====successfully!======" << endl;
+            cout << endl;
+            break;
+        }
+
+        for (int i = 0; i < POP_SIZE; i++) {
+            int index_p1 = sample(fitness);
+            int index_p2 = sample(fitness);
+            auto parent1 = new individual(*pop[index_p1]);
+            auto parent2 = new individual(*pop[index_p2]);
+
+            parent1->crossover(parent2);
+            individual::mutation(parent1);
+
+            new_pop[i] = parent1;
+            individual::clean(parent2->root);
+            delete parent2;
+        }
+
+        swap(pop, new_pop);
+
+        // free pointer;
+        for (int i = 0; i < POP_SIZE; i++) {
+            individual::clean(new_pop[i]->root);
+            delete new_pop[i];
+        }
+        delete [] new_pop;
+    }
+
+    // free pointer
+    delete [] st;
+    delete [] nst;
+
+    for (int i = 0; i < POP_SIZE; i++) {
+        individual::clean(pop[i]->root);
+        delete pop[i];
+    }
+    delete [] pop;
 
 }

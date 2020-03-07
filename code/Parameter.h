@@ -10,7 +10,7 @@
 const int MIN_DEPTH = 3;
 const int INI_DEPTH = 5;
 const int MUT_DEPTH = 3;
-const int MAX_GENERATION = 1000;
+const int MAX_GENERATION = 100;
 const int T_S = 5; // Tournament Size
 const double C_P = 0.5; // Crossover Probability
 const double M_P = 0.2; // Mutation Probability
