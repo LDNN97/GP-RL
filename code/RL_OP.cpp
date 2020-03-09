@@ -15,10 +15,13 @@ void rl::env_reset(py::object &env, double* st){
 
 void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end) {
     py::list nst_or = env.attr("step")(act);
+//    py::print(nst_or);
     py::array_t<double, py::array::c_style | py::array::forcecast> nst_tr(nst_or[0]);
     std::memcpy(nst, nst_tr.data(), nst_tr.size() * sizeof(double));
     reward = py::cast<double>(nst_or[1]);
     end = py::cast<bool>(nst_or[2]);
+//    py::print(nst_or[2]);
+//    cout << "reset" << end  << endl;
 }
 
 rl::rec rl::get_max_action(py::object &env, individual* indi){
@@ -26,7 +29,7 @@ rl::rec rl::get_max_action(py::object &env, individual* indi){
     double max_v = 0; int max_act = 0; double v = 0;
     for (int i = 0; i <= 1; i++){
         rl::env_step(env, i, nst, reward, end);
-        v = reward + 0.9 * individual::calculate(indi->root, nst);
+        v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
             max_v = v;
             max_act = i;
@@ -73,7 +76,7 @@ void rl::rl_op() {
 
     //fitness
     double fitness[POP_SIZE];
-    double total;
+    double fitness_total, reward_total;
     int best_indi;
 
     auto st = new double [4]; auto nst = new double [4];
@@ -86,14 +89,14 @@ void rl::rl_op() {
     memset(fitness, 0, sizeof(fitness));
     for (int i = 0; i < POP_SIZE; i++) {
         rl::env_reset(env, st);
-        for (int step = 0; step < 100; step++){
+        for (int step = 0; step < 200; step++){
             action = get_max_action(env, pop[i]);
             rl::env_step(env, action.a, nst, reward, end);
             if (end) break;
             fitness[i] += reward;
         }
         cout << i << " " << fitness[i] << endl;
-        best_indi = (fitness[best_indi] >= fitness[i]) ? best_indi : i;
+        best_indi = (fitness[best_indi] > fitness[i]) ? best_indi : i;
     }
     cout << best_indi << endl;
     lgbi = new individual(*pop[best_indi]);
@@ -102,15 +105,15 @@ void rl::rl_op() {
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
         std::cout << "Generation: " << gen << std::endl;
-        env.attr("reset_ini")();
+//        env.attr("reset_ini")();
 
         auto new_pop = new individual* [POP_SIZE];
 
-        total = 0; best_indi = 0;
+        fitness_total = 0; reward_total = 0;
         memset(fitness, 0, sizeof(fitness));
         for (int i = 0; i < POP_SIZE; i++) {
             env_reset(env, st);
-            int cnt = 0;
+            int cnt = 0; double reward_indi = 0;
             for (int step = 0; step < 200; step++){
                 double target = rl::cal_target(env, lgbi);
                 double evolved = individual::calculate(pop[i]->root, st);
@@ -121,31 +124,27 @@ void rl::rl_op() {
                 rl::env_step(env, action.a, nst, reward, end);
                 std::swap(st, nst);
                 if (end) break;
+                reward_indi += 1;
             }
             fitness[i] /= double(cnt);
-            cout << i << " " << fitness[i] << endl;
-            total += fitness[i];
+            fitness_total += fitness[i];
+            reward_total += reward_indi;
+
             best_indi = (fitness[best_indi] <= fitness[i]) ? best_indi : i;
+
+            cout << i << " " << fitness[i] << " " << reward_indi << endl;
         }
 
         delete lgbi;
         lgbi = new individual(*pop[best_indi]);
 
-        cout << " Average Fitness: " << total / double(POP_SIZE) << endl;
-        cout << "Best Fitness: " << fitness[best_indi] << endl;
+        cout << " Average Fitness: " << fitness_total / double(POP_SIZE) << endl;
+        cout << "Best ID and Fitness: " << best_indi << " " << fitness[best_indi] << endl;
         cout << "Tree Size: " << pop[best_indi]->root->size << endl;
 
-        double total_reward = 0;
-        rl::env_reset(env, st);
-        for (int step = 0; step < 200; step++){
-            action = get_max_action(env, lgbi);
-            rl::env_step(env, action.a, nst, reward, end);
-            if (end) break;
-            total_reward += reward;
-        }
-        cout << "Reward: " << total_reward << endl;
+        cout << "Average Reward: " << reward_total / double(POP_SIZE) << endl;
 
-        if (total / double(POP_SIZE) < 1e-3) {
+        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 180)) {
             cout << "=====successfully!======" << endl;
             cout << endl;
             break;
