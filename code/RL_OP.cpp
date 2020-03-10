@@ -50,7 +50,7 @@ int rl::sample(const double * fitness){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
         int tmp = rand_int(0, POP_SIZE);
-        ans = (fitness[ans] < fitness[tmp]) ? ans : tmp;
+        ans = (fitness[ans] > fitness[tmp]) ? ans : tmp;
     }
     return ans;
 }
@@ -105,7 +105,7 @@ void rl::rl_op() {
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
         std::cout << "Generation: " << gen << std::endl;
-//        env.attr("reset_ini")();
+        env.attr("reset_ini")();
 
         auto new_pop = new individual* [POP_SIZE];
 
@@ -114,11 +114,11 @@ void rl::rl_op() {
         for (int i = 0; i < POP_SIZE; i++) {
             env_reset(env, st);
             int cnt = 0; double reward_indi = 0;
-            for (int step = 0; step < 200; step++){
-                double target = rl::cal_target(env, lgbi);
-                double evolved = individual::calculate(pop[i]->root, st);
-                fitness[i] += (target - evolved) * (target - evolved);
-                cnt++;
+            for (int step = 0; step < 500; step++){
+//                double target = rl::cal_target(env, lgbi);
+//                double evolved = individual::calculate(pop[i]->root, st);
+//                fitness[i] += (target - evolved) * (target - evolved);
+//                cnt++;
 
                 action = get_max_action(env, pop[i]);
                 rl::env_step(env, action.a, nst, reward, end);
@@ -126,11 +126,12 @@ void rl::rl_op() {
                 if (end) break;
                 reward_indi += 1;
             }
-            fitness[i] /= double(cnt);
+            fitness[i] = reward_indi;
+//            fitness[i] /= double(cnt);
             fitness_total += fitness[i];
             reward_total += reward_indi;
 
-            best_indi = (fitness[best_indi] <= fitness[i]) ? best_indi : i;
+            best_indi = (fitness[best_indi] > fitness[i]) ? best_indi : i;
 
             cout << i << " " << fitness[i] << " " << reward_indi << endl;
         }
@@ -144,7 +145,7 @@ void rl::rl_op() {
 
         cout << "Average Reward: " << reward_total / double(POP_SIZE) << endl;
 
-        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 180)) {
+        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
             cout << "=====successfully!======" << endl;
             cout << endl;
             break;
@@ -173,6 +174,8 @@ void rl::rl_op() {
         }
         delete [] new_pop;
     }
+
+    individual::save_indi(pop[best_indi]->root);
 
     // free pointer
     delete [] st;

@@ -86,8 +86,6 @@ double individual::cal_fitness(const individual& indi, int num,  double** xx, do
     return fitness;
 }
 
-
-
 void individual::show(node* now, vector<item>** pic, int* pos, int depth, int Max_depth){
     if (now->type == 1) {
         pic[depth - 1]->push_back(item(pos[depth - 1], now->symbol));
@@ -280,4 +278,53 @@ void individual::clean(node* now){
     clean(now->right);
     delete now;
 }
+
+typedef std::pair<int, int> link;
+
+void individual::save_indi(node* now){
+    ofstream file("Individual.txt");
+    file << now->size << endl;
+
+    vector<link> tree;
+    node* que[now->size + 5];
+    int f_ptr = 0, b_ptr = 1;
+    que[0] = now;
+
+    file << 0 << " " <<
+        que[0]->size << " " << que[0]->type << " " << que[0]->symbol << endl;
+
+    while (f_ptr < b_ptr){
+        if (que[f_ptr]->left != nullptr) {
+            tree.emplace_back(f_ptr, b_ptr);
+            que[b_ptr] = que[f_ptr]->left;
+
+            file << b_ptr << " " <<
+                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << endl;
+
+            b_ptr += 1;
+        }
+        if (que[f_ptr]->right != nullptr) {
+            tree.emplace_back(f_ptr, b_ptr);
+            que[b_ptr] = que[f_ptr]->right;
+
+            file << b_ptr << " " <<
+                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << endl;
+
+            b_ptr += 1;
+        }
+        f_ptr++;
+    }
+
+    for (auto item : tree)
+        file << item.first << " " << item.second << endl;
+
+    file.close();
+}
+
+void individual::load_indi(node* now){
+
+
+}
+
+
 

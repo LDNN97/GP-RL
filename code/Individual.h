@@ -6,7 +6,9 @@
 #define GP_CPP_INDIVIDUAL_H
 
 #include <iostream>
+#include <fstream>
 #include <vector>
+#include <queue>
 #include "Parameter.h"
 #include "Random.h"
 #include "Tree_node.h"
@@ -32,8 +34,13 @@ public:
     void crossover(individual* another);
     static int cal_depth(node* now);
     static void mutation(individual* indi);
+
     // free pointer
     static void clean(node* now);
+
+    // save model
+    static void save_indi(node* now);
+    static void load_indi(node* now);
 };
 
 #endif //GP_CPP_INDIVIDUAL_H
