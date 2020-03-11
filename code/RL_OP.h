@@ -13,6 +13,10 @@
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 
+const std::string env_name = "MountainCar-v0"; // CartPole-v0 or MountainCar-v0
+const int n_action = 2;
+const int n_observation = 2;
+
 namespace rl{
     struct rec{
         int a;
@@ -24,8 +28,8 @@ namespace rl{
     rec get_max_action(pybind11::object &env, individual* indi);
     double cal_target(pybind11::object &env, individual* lgbi);
     int sample(const double * fitness);
-
     void rl_op();
+    void display();
 }
 
 #endif //GP_CPP_RL_OP_H

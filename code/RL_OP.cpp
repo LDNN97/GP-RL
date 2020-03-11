@@ -25,9 +25,9 @@ void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, 
 }
 
 rl::rec rl::get_max_action(py::object &env, individual* indi){
-    double nst[4]; double reward = 0; bool end = false;
+    double nst[n_observation]; double reward = 0; bool end = false;
     double max_v = 0; int max_act = 0; double v = 0;
-    for (int i = 0; i <= 1; i++){
+    for (int i = 0; i <= n_action; i++){
         rl::env_step(env, i, nst, reward, end);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
@@ -55,13 +55,46 @@ int rl::sample(const double * fitness){
     return ans;
 }
 
+void rl::display() {
+    cout << "Display the result" << endl;
+
+    py::scoped_interpreter guard{};
+    py::module::import("sys").attr("argv").attr("append")("");
+
+    py::object gym = py::module::import("gym");
+    py::object env = gym.attr("make")(env_name);
+
+    individual* indi = individual::load_indi("Individual.txt");
+
+    auto st = new double [n_observation]; auto nst = new double [n_observation];
+    rl::rec action{}; double reward; bool end;
+
+    env.attr("reset_ini")();
+    rl::env_reset(env, st);
+    double reward_indi = 0;
+    for (int step = 0; step < 500; step++){
+        action = rl::get_max_action(env, indi);
+        rl::env_step(env, action.a, nst, reward, end);
+        std::swap(st, nst);
+        if (end) break;
+        reward_indi += -1;
+        env.attr("render")();
+    }
+    env.attr("close")();
+
+    cout << "reward: " << reward_indi << endl;
+
+    individual::clean(indi->root);
+    delete indi;
+}
+
 void rl::rl_op() {
     // GYM
     py::scoped_interpreter guard{};
     py::module::import("sys").attr("argv").attr("append")("");
 
     py::object gym = py::module::import("gym");
-    py::object env = gym.attr("make")("CartPole-v0");
+    py::object env = gym.attr("make")(env_name);
 
     // build a model
     auto pop = new individual* [POP_SIZE];
@@ -81,7 +114,7 @@ void rl::rl_op() {
     double fitness_total, reward_total;
     int best_indi;
 
-    auto st = new double [4]; auto nst = new double [4];
+    auto st = new double [n_observation]; auto nst = new double [n_observation];
     rec action{}; double reward; bool end;
     individual* lgbi;
 
@@ -91,7 +124,7 @@ void rl::rl_op() {
     memset(fitness, 0, sizeof(fitness));
     for (int i = 0; i < POP_SIZE; i++) {
         rl::env_reset(env, st);
-        for (int step = 0; step < 200; step++){
+        for (int step = 0; step < 500; step++){
             action = get_max_action(env, pop[i]);
             rl::env_step(env, action.a, nst, reward, end);
             if (end) break;
@@ -126,7 +159,7 @@ void rl::rl_op() {
                 rl::env_step(env, action.a, nst, reward, end);
                 std::swap(st, nst);
                 if (end) break;
-                reward_indi += 1;
+                reward_indi += -1;
             }
             fitness[i] = reward_indi;
 //            fitness[i] /= double(cnt);
@@ -138,8 +171,8 @@ void rl::rl_op() {
             cout << i << " " << fitness[i] << " " << reward_indi << endl;
         }
 
-        delete lgbi;
-        lgbi = new individual(*pop[best_indi]);
+//        delete lgbi;
+//        lgbi = new individual(*pop[best_indi]);
 
         cout << " Average Fitness: " << fitness_total / double(POP_SIZE) << endl;
         cout << "Best ID and Fitness: " << best_indi << " " << fitness[best_indi] << endl;
@@ -147,11 +180,11 @@ void rl::rl_op() {
 
         cout << "Average Reward: " << reward_total / double(POP_SIZE) << endl;
 
-        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
-            cout << "=====successfully!======" << endl;
-            cout << endl;
-            break;
-        }
+//        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
+//            cout << "=====successfully!======" << endl;
+//            cout << endl;
+//            break;
+//        }
 
         for (int i = 0; i < POP_SIZE; i++) {
             int index_p1 = sample(fitness);
@@ -177,26 +210,10 @@ void rl::rl_op() {
         delete [] new_pop;
     }
 
+    // save the model
     individual::save_indi(pop[best_indi]->root, "Individual.txt");
 
-    individual* indi = individual::load_indi("Individual.txt");
-    env_reset(env, st);
-    double reward_indi = 0;
-    for (int step = 0; step < 500; step++){
-        action = get_max_action(env, indi);
-        rl::env_step(env, action.a, nst, reward, end);
-        std::swap(st, nst);
-        if (end) break;
-        reward_indi += 1;
-        env.attr("render")();
-    }
-    env.attr("close")();
-    individual::save_indi(indi->root, "check.txt");
-
     // free pointer
-    individual::clean(indi->root);
-    delete indi;
-
     delete [] st;
     delete [] nst;
 
