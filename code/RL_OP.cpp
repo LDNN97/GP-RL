@@ -58,6 +58,8 @@ int rl::sample(const double * fitness){
 void rl::rl_op() {
     // GYM
     py::scoped_interpreter guard{};
+    py::module::import("sys").attr("argv").attr("append")("");
+
     py::object gym = py::module::import("gym");
     py::object env = gym.attr("make")("CartPole-v0");
 
@@ -186,7 +188,9 @@ void rl::rl_op() {
         std::swap(st, nst);
         if (end) break;
         reward_indi += 1;
+        env.attr("render")();
     }
+    env.attr("close")();
     individual::save_indi(indi->root, "check.txt");
 
     // free pointer
