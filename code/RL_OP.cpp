@@ -175,9 +175,24 @@ void rl::rl_op() {
         delete [] new_pop;
     }
 
-    individual::save_indi(pop[best_indi]->root);
+    individual::save_indi(pop[best_indi]->root, "Individual.txt");
+
+    individual* indi = individual::load_indi("Individual.txt");
+    env_reset(env, st);
+    double reward_indi = 0;
+    for (int step = 0; step < 500; step++){
+        action = get_max_action(env, indi);
+        rl::env_step(env, action.a, nst, reward, end);
+        std::swap(st, nst);
+        if (end) break;
+        reward_indi += 1;
+    }
+    individual::save_indi(indi->root, "check.txt");
 
     // free pointer
+    individual::clean(indi->root);
+    delete indi;
+
     delete [] st;
     delete [] nst;
 

@@ -279,10 +279,11 @@ void individual::clean(node* now){
     delete now;
 }
 
-typedef std::pair<int, int> link;
+typedef std::pair<int, int> rela;
+typedef std::pair<int, rela> link;
 
-void individual::save_indi(node* now){
-    ofstream file("Individual.txt");
+void individual::save_indi(node* now, const string& file_name){
+    ofstream file(file_name);
     file << now->size << endl;
 
     vector<link> tree;
@@ -295,7 +296,7 @@ void individual::save_indi(node* now){
 
     while (f_ptr < b_ptr){
         if (que[f_ptr]->left != nullptr) {
-            tree.emplace_back(f_ptr, b_ptr);
+            tree.emplace_back(f_ptr, rela(0, b_ptr));
             que[b_ptr] = que[f_ptr]->left;
 
             file << b_ptr << " " <<
@@ -304,7 +305,7 @@ void individual::save_indi(node* now){
             b_ptr += 1;
         }
         if (que[f_ptr]->right != nullptr) {
-            tree.emplace_back(f_ptr, b_ptr);
+            tree.emplace_back(f_ptr, rela(1, b_ptr));
             que[b_ptr] = que[f_ptr]->right;
 
             file << b_ptr << " " <<
@@ -316,14 +317,39 @@ void individual::save_indi(node* now){
     }
 
     for (auto item : tree)
-        file << item.first << " " << item.second << endl;
+        file << item.first << " " << item.second.first << " " << item.second.second << endl;
 
     file.close();
 }
 
-void individual::load_indi(node* now){
+individual* individual::load_indi(const string& file_name){
+    int size;
+    ifstream file(file_name);
+    file >> size;
 
+    node* nodes[size];
+    int id, si, ty; string str;
+    for (int i = 0; i < size; i++) {
+        file >> id >> si >> ty >> str;
+        node* now = new node(nullptr, nullptr, nullptr, si, ty, str);
+        nodes[id] = now;
+    }
 
+    int parent, lor, son;
+    for (int i = 0; i < size - 1; i++){
+        file >> parent >> lor >> son;
+        if (lor == 0) {
+            nodes[parent]->left = nodes[son];
+            nodes[son]->father = nodes[parent];
+        } else {
+            nodes[parent]->right = nodes[son];
+            nodes[son]->father = nodes[parent];
+        }
+    }
+
+    file.close();
+    auto* indi = new individual(nodes[0]);
+    return indi;
 }
 
 

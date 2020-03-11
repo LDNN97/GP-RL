@@ -39,8 +39,8 @@ public:
     static void clean(node* now);
 
     // save model
-    static void save_indi(node* now);
-    static void load_indi(node* now);
+    static void save_indi(node* now, const std::string& file_name);
+    static individual* load_indi(const std::string& file_name);
 };
 
 #endif //GP_CPP_INDIVIDUAL_H
