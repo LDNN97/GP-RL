@@ -111,7 +111,8 @@ void rl::rl_op() {
 
     //fitness
     double fitness[POP_SIZE];
-    double fitness_total, reward_total;
+    double dist[POP_SIZE];
+    double fitness_total, dist_total;
     int best_indi;
 
     auto st = new double [n_observation]; auto nst = new double [n_observation];
@@ -136,7 +137,8 @@ void rl::rl_op() {
     cout << best_indi << endl;
     lgbi = new individual(*pop[best_indi]);
 
-//    return;
+    std::array<double, MAX_GENERATION> f_a {};
+    std::array<double, MAX_GENERATION> d_a {};
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
         std::cout << "Generation: " << gen << std::endl;
@@ -144,41 +146,42 @@ void rl::rl_op() {
 
         auto new_pop = new individual* [POP_SIZE];
 
-        fitness_total = 0; reward_total = 0;
+        best_indi = 0;fitness_total = 0; dist_total = 0;
         memset(fitness, 0, sizeof(fitness));
+        memset(dist, 0, sizeof(dist));
         for (int i = 0; i < POP_SIZE; i++) {
             env_reset(env, st);
-            int cnt = 0; double reward_indi = 0;
+            int cnt = 0;
             for (int step = 0; step < 500; step++){
-//                double target = rl::cal_target(env, lgbi);
-//                double evolved = individual::calculate(pop[i]->root, st);
-//                fitness[i] += (target - evolved) * (target - evolved);
-//                cnt++;
+                double target = rl::cal_target(env, lgbi);
+                double evolved = individual::calculate(pop[i]->root, st);
+                dist[i] += (target - evolved) * (target - evolved);
+                cnt++;
 
                 action = get_max_action(env, pop[i]);
                 rl::env_step(env, action.a, nst, reward, end);
                 std::swap(st, nst);
                 if (end) break;
-                reward_indi += -1;
+                fitness[i] += -1;
             }
-            fitness[i] = reward_indi;
-//            fitness[i] /= double(cnt);
             fitness_total += fitness[i];
-            reward_total += reward_indi;
+            dist[i] /= double(cnt);
+            dist_total += dist[i];
 
             best_indi = (fitness[best_indi] > fitness[i]) ? best_indi : i;
 
-            cout << i << " " << fitness[i] << " " << reward_indi << endl;
+            cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
 
-//        delete lgbi;
-//        lgbi = new individual(*pop[best_indi]);
+        delete lgbi;
+        lgbi = new individual(*pop[best_indi]);
 
-        cout << " Average Fitness: " << fitness_total / double(POP_SIZE) << endl;
+        f_a[gen] = fitness_total / double(POP_SIZE);
+        d_a[gen] = dist_total / double(POP_SIZE);
+        cout << " Average Fitness and Dist " << f_a[gen] << " " << d_a[gen] << endl;
         cout << "Best ID and Fitness: " << best_indi << " " << fitness[best_indi] << endl;
         cout << "Tree Size: " << pop[best_indi]->root->size << endl;
 
-        cout << "Average Reward: " << reward_total / double(POP_SIZE) << endl;
 
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
 //            cout << "=====successfully!======" << endl;
@@ -210,8 +213,27 @@ void rl::rl_op() {
         delete [] new_pop;
     }
 
+    // print the average fit and dist
+    ofstream file("Average.txt");
+    for (int i = 0; i < MAX_GENERATION; i++)
+        file << i << " " << f_a[i] << " " << d_a[i] << endl;
+    file.close();
+
     // save the model
     individual::save_indi(pop[best_indi]->root, "Individual.txt");
+
+    // print
+    py::object _f_a = py::cast(f_a);
+    py::object _d_a = py::cast(d_a);
+    py::object plt = py::module::import("matplotlib.pyplot");
+    plt.attr("figure")();
+
+    plt.attr("subplot")(211);
+    plt.attr("plot")(_f_a);
+    plt.attr("subplot")(212);
+    plt.attr("plot")(_d_a);
+    plt.attr("yscale")("log");
+    plt.attr("show")();
 
     // free pointer
     delete [] st;

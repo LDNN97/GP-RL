@@ -8,10 +8,12 @@
 #include "Individual.h"
 #include "Random.h"
 
+#include <array>
 #include <iostream>
 #include <pybind11/pybind11.h>
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 const std::string env_name = "MountainCar-v0"; // CartPole-v0 or MountainCar-v0
 const int n_action = 2;
