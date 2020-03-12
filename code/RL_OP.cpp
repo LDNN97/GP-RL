@@ -46,11 +46,29 @@ double rl::cal_target(pybind11::object &env, individual* lgbi){
     return act.v;
 }
 
-int rl::sample(const double * fitness){
+template <typename T>
+
+vector<size_t> sort_indexes(const vector<T> &v) {
+    vector<size_t> idx(v.size());
+    iota(idx.begin(), idx.end(), 0);
+    stable_sort(idx.begin(), idx.end(), [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
+    return idx;
+}
+
+std::vector<double> rl::get_rank(std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate ) {
+    auto fit_rk = sort_indexes(fitness);
+    auto dis_rk = sort_indexes(dist);
+    vector<double> rank(POP_SIZE);
+    for (int i = 0; i < POP_SIZE; i++)
+        rank[i] = fit_rate * fit_rk[i] + dis_rate * dis_rk[i];
+    return rank;
+}
+
+int rl::sample(vector<double> &rank){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
         int tmp = rand_int(0, POP_SIZE);
-        ans = (fitness[ans] > fitness[tmp]) ? ans : tmp;
+        ans = (rank[ans] > rank[tmp]) ? ans : tmp;
     }
     return ans;
 }
@@ -110,19 +128,19 @@ void rl::rl_op() {
     }
 
     //fitness
-    double fitness[POP_SIZE];
-    double dist[POP_SIZE];
+    vector<double> fitness(POP_SIZE);
+    vector<double> dist(POP_SIZE);
     double fitness_total, dist_total;
     int best_indi;
 
     auto st = new double [n_observation]; auto nst = new double [n_observation];
     rec action{}; double reward; bool end;
-    individual* lgbi;
+    individual* lgbi; double fitness_lgbi;
 
     //Best individual in ini_pop
     env.attr("reset_ini")();
     best_indi = 0;
-    memset(fitness, 0, sizeof(fitness));
+    fitness.clear();
     for (int i = 0; i < POP_SIZE; i++) {
         rl::env_reset(env, st);
         for (int step = 0; step < 500; step++){
@@ -136,6 +154,8 @@ void rl::rl_op() {
     }
     cout << best_indi << endl;
     lgbi = new individual(*pop[best_indi]);
+    fitness_lgbi = fitness[best_indi];
+
 
     std::array<double, MAX_GENERATION> f_a {};
     std::array<double, MAX_GENERATION> d_a {};
@@ -147,8 +167,8 @@ void rl::rl_op() {
         auto new_pop = new individual* [POP_SIZE];
 
         best_indi = 0;fitness_total = 0; dist_total = 0;
-        memset(fitness, 0, sizeof(fitness));
-        memset(dist, 0, sizeof(dist));
+        fitness.clear();
+        dist.clear();
         for (int i = 0; i < POP_SIZE; i++) {
             env_reset(env, st);
             int cnt = 0;
@@ -173,13 +193,38 @@ void rl::rl_op() {
             cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
 
-        delete lgbi;
-        lgbi = new individual(*pop[best_indi]);
+//        double fitness_lgbi = 0;
+//        env_reset(env, st);
+//        for (int step = 0; step < 500; step++){
+//            action = get_max_action(env, lgbi);
+//            rl::env_step(env, action.a, nst, reward, end);
+//            std::swap(st, nst);
+//            if (end) break;
+//            fitness_lgbi += -1;
+//        }
+
+        // select rank mode
+        double fit_rate = 0, dis_rate = 0;
+        if (fitness_lgbi < fitness[best_indi]) {
+            delete lgbi;
+            lgbi = new individual(*pop[best_indi]);
+            fit_rate = 1; dis_rate = 0;
+        } else {
+            double rate = (fitness_lgbi - fitness[best_indi]) / fitness_lgbi;
+            if (rate <= 0.1) {
+                fit_rate = 0.7; dis_rate = 0.3;
+            } else {
+                fit_rate = 0.3; dis_rate = 0.7;
+            }
+        }
+
+        // get rank
+        vector<double> rank = get_rank(fitness, dist, fit_rate, dis_rate);
 
         f_a[gen] = fitness_total / double(POP_SIZE);
         d_a[gen] = dist_total / double(POP_SIZE);
         cout << " Average Fitness and Dist " << f_a[gen] << " " << d_a[gen] << endl;
-        cout << "Best ID and Fitness: " << best_indi << " " << fitness[best_indi] << endl;
+        cout << "Best ID and Fitness: " << best_indi << " " << fitness[best_indi] << " " << fitness_lgbi << endl;
         cout << "Tree Size: " << pop[best_indi]->root->size << endl;
 
 
@@ -190,8 +235,8 @@ void rl::rl_op() {
 //        }
 
         for (int i = 0; i < POP_SIZE; i++) {
-            int index_p1 = sample(fitness);
-            int index_p2 = sample(fitness);
+            int index_p1 = sample(rank);
+            int index_p2 = sample(rank);
             auto parent1 = new individual(*pop[index_p1]);
             auto parent2 = new individual(*pop[index_p2]);
 
