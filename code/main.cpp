@@ -3,7 +3,7 @@
 
 int main() {
 //    num::num_op();
-    rl::rl_op();
-//    rl::display();
+//    rl::rl_op();
+    rl::display();
 }
 

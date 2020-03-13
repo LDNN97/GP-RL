@@ -27,7 +27,7 @@ void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, 
 rl::rec rl::get_max_action(py::object &env, individual* indi){
     double nst[n_observation]; double reward = 0; bool end = false;
     double max_v = 0; int max_act = 0; double v = 0;
-    for (int i = 0; i <= n_action; i++){
+    for (int i = 0; i < n_action; i++){ // env: CartPole <  MountainCar <=
         rl::env_step(env, i, nst, reward, end);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
@@ -96,20 +96,21 @@ void rl::display() {
     auto st = new double [n_observation]; auto nst = new double [n_observation];
     rl::rec action{}; double reward; bool end;
 
-    env.attr("reset_ini")();
-    rl::env_reset(env, st);
-    double reward_indi = 0;
-    for (int step = 0; step < 500; step++){
-        action = rl::get_max_action(env, indi);
-        rl::env_step(env, action.a, nst, reward, end);
-        std::swap(st, nst);
-        if (end) break;
-        reward_indi += -1;
-        env.attr("render")();
+    for (int i = 0; i < 5; i++) {
+        env.attr("reset_ini")();
+        rl::env_reset(env, st);
+        double reward_indi = 0;
+        for (int step = 0; step < 500; step++){
+            action = rl::get_max_action(env, indi);
+            rl::env_step(env, action.a, nst, reward, end);
+            std::swap(st, nst);
+            if (end) break;
+            reward_indi += reward; //env CartPole +1 MountainCar -1
+            env.attr("render")();
+        }
+        cout << reward_indi << endl;
     }
     env.attr("close")();
-
-    cout << "reward: " << reward_indi << endl;
 
     individual::clean(indi->root);
     delete indi;
@@ -198,7 +199,7 @@ void rl::rl_op() {
                 rl::env_step(env, action.a, nst, reward, end);
                 std::swap(st, nst);
                 if (end) break;
-                _fit_tot += -1;
+                _fit_tot += reward; //env CartPole +1 MountainCar -1
             }
             dist.push_back(_dis_tot / cnt);
             fitness.push_back(_fit_tot);
@@ -233,7 +234,7 @@ void rl::rl_op() {
         // select rank mode
         double fit_rate = 1, dis_rate = 0;
 
-//        // original
+        // original
 //        if (fitness[best_indi] >= fitness_utnbi) {
 //            delete utnbi;
 //            utnbi = new individual(*pop[best_indi]);
@@ -252,14 +253,7 @@ void rl::rl_op() {
             }
             lgar = f_a[gen];
         } else {
-            // method2
-//            fit_rate = 0.5; dis_rate = 0.5;
-//            if (fitness[best_indi] >= fitness_utnbi) {
-//                delete utnbi;
-//                utnbi = new individual(*pop[best_indi]);
-//                fitness_utnbi = fitness[best_indi];
-//            }
-
+            //method1
             if (fitness[best_indi] >= fitness_utnbi) {
                 delete utnbi;
                 utnbi = new individual(*pop[best_indi]);
@@ -268,6 +262,15 @@ void rl::rl_op() {
             } else {
                 fit_rate = 0; dis_rate = 1;
             }
+
+            //method2
+//            fit_rate = 0.5; dis_rate = 0.5;
+//            if (fitness[best_indi] >= fitness_utnbi) {
+//                delete utnbi;
+//                utnbi = new individual(*pop[best_indi]);
+//                fitness_utnbi = fitness[best_indi];
+//            }
+
             lgar = f_a[gen];
         }
 
@@ -308,13 +311,13 @@ void rl::rl_op() {
     }
 
     // print the average fit and dist
-    ofstream file("Average2.txt");
+    ofstream file("Average.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
         file << i << " " << b_i[i] << " " << f_a[i] << " " << d_a[i] << endl;
     file.close();
 
     // save the model
-    individual::save_indi(pop[best_indi]->root, "Individual.txt");
+    individual::save_indi(utnbi->root, "Individual.txt");
 
     // print
     py::object _b_i = py::cast(b_i);

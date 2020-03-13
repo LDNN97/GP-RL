@@ -17,9 +17,9 @@
 #include <numeric>      // std::iota
 #include <algorithm>
 
-const std::string env_name = "MountainCar-v0"; // CartPole-v0 or MountainCar-v0
+const std::string env_name = "CartPole-v0"; // CartPole-v0 or MountainCar-v0
 const int n_action = 2;
-const int n_observation = 2;
+const int n_observation = 4;
 
 namespace rl{
     struct rec{
