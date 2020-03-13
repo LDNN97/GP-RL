@@ -32,7 +32,7 @@ namespace rl{
     rec get_max_action(pybind11::object &env, individual* indi);
     double cal_target(pybind11::object &env, individual* lgbi);
     int sample(std::vector<double> &rank);
-    std::vector<double> get_rank(std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate);
+    void get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate);
     void rl_op();
     void display();
 }
