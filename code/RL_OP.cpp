@@ -13,7 +13,7 @@ void rl::env_reset(py::object &env, double* st){
     std::memcpy(st, st_tr.data(), st_tr.size() * sizeof(double));
 }
 
-void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end) {
+void rl::env_step(pybind11::object &env, double &act, double* nst, double &reward, bool &end) {
     py::list nst_or = env.attr("step")(act);
 //    py::print(nst_or);
     py::array_t<double, py::array::c_style | py::array::forcecast> nst_tr(nst_or[0]);
@@ -26,16 +26,31 @@ void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, 
 
 rl::rec rl::get_max_action(py::object &env, individual* indi){
     double nst[n_observation]; double reward = 0; bool end = false;
-    double max_v = 0; int max_act = 0; double v = 0;
-    for (int i = 0; i <= n_action; i++){ // env: CartPole <  MountainCar <=
-        rl::env_step(env, i, nst, reward, end);
+    double max_v = 0; double max_act = 0; double v = 0;
+
+    // Discrete
+//    for (int i = 0; i <= n_action; i++){ // env: CartPole <  MountainCar <=
+//        rl::env_step(env, i, nst, reward, end);
+//        v = reward + 1 * individual::calculate(indi->root, nst);
+//        if (v > max_v) {
+//            max_v = v;
+//            max_act = i;
+//        }
+//        env.attr("back_step")();
+//    }
+
+    // Continuous
+    for (int i = 0; i <= 5; i++){ // env: CartPole <  MountainCar <=
+        double act_tmp = rand_real(-1, 1);
+        rl::env_step(env, act_tmp, nst, reward, end);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
             max_v = v;
-            max_act = i;
+            max_act = act_tmp;
         }
         env.attr("back_step")();
     }
+
     rl::rec ans{};
     ans.a = max_act; ans.v = max_v;
     return ans;
@@ -235,7 +250,7 @@ void rl::rl_op() {
 
 
         // select rank mode
-        double fit_rate = 1, dis_rate = 0;
+        double fit_rate, dis_rate;
 
         // original
 //        if (fitness[best_indi] >= fitness_utnbi) {

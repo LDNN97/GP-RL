@@ -35,6 +35,7 @@ class CartPoleSwingUp(gym.Env):
         self.b = 0.1  # friction coefficient
 
         self.t = 0 # timestep
+        self.last_t = None
         self.t_limit = 1000
 
         # Angle at which to fail the episode
@@ -53,30 +54,20 @@ class CartPoleSwingUp(gym.Env):
 
         self.seed()
         self.viewer = None
+
+        self.ini_state = None
         self.state = None
+        self.last_state = None
 
-        self.noise = 0
-
-    def setEnv(self, envChange):
-        '''
-        Changes the environment, envChange is the percent change of parameter
-        '''
-        self.l = self.l_base*envChange
-
-    def setNoise(self, noiseVariance):
-        '''
-        Changes the leven of input noise
-        '''
-        self.noise = noiseVariance
 
     def seed(self, seed=None):
-        self.np_random, seed = seeding.np_random(seed)
+        np.random.seed(0)
+        self.np_random = np.random
+        # self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def stateUpdate(self,action,state, noise=0):
+    def stateUpdate(self, action, state):
         x, x_dot, theta, theta_dot = state
-        x     += np.random.randn() * noise
-        theta += np.random.randn() * noise
 
         s = math.sin(theta)
         c = math.cos(theta)
@@ -93,21 +84,23 @@ class CartPoleSwingUp(gym.Env):
 
         return (x, x_dot, theta, theta_dot)
 
-    def step(self, action):
-        # Valid action
-        action = np.clip(action, -1.0, 1.0)[0]
-        action *= self.force_mag
+    def back_step(self):
+        self.state = self.last_state
+        self.t = self.last_t
 
-        noise_obs = self.stateUpdate(action, self.state, noise=self.noise)
-        self.state = self.stateUpdate(action, self.state)
+    def step(self, action):
+        force = action * self.force_mag
+
+        self.last_state = self.state
+        self.state = self.stateUpdate(force, self.state)
 
         x,x_dot,theta,theta_dot = self.state
-
 
         done = False
         if  x < -self.x_threshold or x > self.x_threshold:
           done = True
 
+        self.last_t = self.t
         self.t += 1
         if self.t >= self.t_limit:
           done = True
@@ -119,19 +112,20 @@ class CartPoleSwingUp(gym.Env):
         reward = reward_theta*reward_x
         #reward = (np.cos(theta)+1.0)/2.0
 
-        x,x_dot,theta,theta_dot = noise_obs
-        obs = np.array([x,x_dot,np.cos(theta),np.sin(theta),theta_dot])
+        obs = np.array(self.state)
 
         return obs, reward, done, {}
 
+    def reset_ini(self):
+        self.ini_state = np.random.normal(loc=np.array([0.0, 0.0, np.pi, 0.0]), scale=np.array([0.2, 0.2, 0.2, 0.2]))
+
     def reset(self):
         #self.state = self.np_random.normal(loc=np.array([0.0, 0.0, 30*(2*np.pi)/360, 0.0]), scale=np.array([0.0, 0.0, 0.0, 0.0]))
-        self.state = np.random.normal(loc=np.array([0.0, 0.0, np.pi, 0.0]), scale=np.array([0.2, 0.2, 0.2, 0.2]))
-        self.steps_beyond_done = None
+        self.state = self.ini_state
+        self.last_state = None
         self.t = 0 # timestep
-        x, x_dot, theta, theta_dot = self.state
-        obs = np.array([x,x_dot,np.cos(theta),np.sin(theta),theta_dot])
-        return obs
+        self.last_t = None
+        return np.array(self.state)
 
     def render(self, mode='human', close=False):
         if close:
