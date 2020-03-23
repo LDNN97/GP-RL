@@ -20,9 +20,13 @@ const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;
 // node
 const int n_f = 4;
 const std::string function_node[n_f]{"+", "-", "*", "/"};
-const int n_t = 4;
-const std::string terminal_node[n_t]{"1", "2", "3", "4"};
-//const int n_t = 2;
-//const std::string terminal_node[n_t]{"1", "2"};
+
+// CartPole
+//const int n_t = 4;
+//const std::string terminal_node[n_t]{"1", "2", "3", "4"};
+
+// MountainCar
+const int n_t = 2;
+const std::string terminal_node[n_t]{"1", "2"};
 
 #endif //GP_CPP_PARAMETER_H

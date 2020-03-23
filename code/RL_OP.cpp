@@ -27,7 +27,7 @@ void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, 
 rl::rec rl::get_max_action(py::object &env, individual* indi){
     double nst[n_observation]; double reward = 0; bool end = false;
     double max_v = 0; int max_act = 0; double v = 0;
-    for (int i = 0; i < n_action; i++){ // env: CartPole <  MountainCar <=
+    for (int i = 0; i <= n_action; i++){ // env: CartPole <  MountainCar <=
         rl::env_step(env, i, nst, reward, end);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
@@ -88,8 +88,11 @@ void rl::display() {
     py::scoped_interpreter guard{};
     py::module::import("sys").attr("argv").attr("append")("");
 
-    py::object gym = py::module::import("gym");
-    py::object env = gym.attr("make")(env_name);
+//    py::object gym = py::module::import("gym");
+//    py::object env = gym.attr("make")(env_name);
+
+    py::object env_list = py::module::import("env");
+    py::object env = env_list.attr(env_name.c_str())();
 
     individual* indi = individual::load_indi("Individual.txt");
 
@@ -121,8 +124,8 @@ void rl::rl_op() {
     py::scoped_interpreter guard{};
     py::module::import("sys").attr("argv").attr("append")("");
 
-    py::object gym = py::module::import("gym");
-    py::object env = gym.attr("make")(env_name);
+    py::object env_list = py::module::import("env");
+    py::object env = env_list.attr(env_name.c_str())();
 
     // build a model
     auto pop = new individual* [POP_SIZE];
