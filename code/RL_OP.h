@@ -23,12 +23,12 @@ const int n_observation = 4;
 
 namespace rl{
     struct rec{
-        double a;
+        int a;
         double v;
     };
 
     void env_reset(pybind11::object &env, double* st);
-    void env_step(pybind11::object &env, double &act, double* nst, double &reward, bool &end);
+    void env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end);
     rec get_max_action(pybind11::object &env, individual* indi);
     double cal_target(pybind11::object &env, individual* lgbi);
     int sample(std::vector<double> &rank);

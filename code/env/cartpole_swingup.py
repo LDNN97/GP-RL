@@ -89,7 +89,7 @@ class CartPoleSwingUp(gym.Env):
         self.t = self.last_t
 
     def step(self, action):
-        force = action * self.force_mag
+        force = self.force_mag if action == 1 else -self.force_mag
 
         self.last_state = self.state
         self.state = self.stateUpdate(force, self.state)
@@ -106,10 +106,17 @@ class CartPoleSwingUp(gym.Env):
           done = True
 
         # Reward staying in the middle
-        reward_theta = (np.cos(theta)+1.0)/2.0
+        reward_theta = np.cos(theta)
         reward_x = np.cos((x/self.x_threshold)*(np.pi/2.0))
 
-        reward = reward_theta*reward_x
+        if reward_theta < 0:
+            reward = 2 * reward_theta * reward_x
+        else:
+            reward = reward_theta * reward_x
+
+        # reward_theta = (np.cos(theta)+1.0)/2.0
+        # reward_x = np.cos((x/self.x_threshold)*(np.pi/2.0))
+        # reward = reward_theta*reward_x
         #reward = (np.cos(theta)+1.0)/2.0
 
         obs = np.array(self.state)
