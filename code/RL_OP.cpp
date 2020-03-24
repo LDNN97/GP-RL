@@ -134,6 +134,8 @@ void rl::display() {
     delete indi;
 }
 
+//Todo: 1. restart 2. best individual with low robustness
+
 void rl::rl_op() {
     // GYM
     py::scoped_interpreter guard{};
