@@ -194,6 +194,11 @@ void rl::rl_op() {
 //            cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
 
+        if (utnbi == nullptr) {
+            utnbi = new individual(*pop[best_indi]);
+            fitness_utnbi = fitness[best_indi];
+        }
+
         f_a[gen] = fitness_total / double(POP_SIZE);
         sim_a[gen] = sim_total / double(POP_SIZE);
         siz_a[gen] = size_total / double(POP_SIZE);
