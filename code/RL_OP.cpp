@@ -13,23 +13,19 @@ void rl::env_reset(py::object &env, double* st){
     std::memcpy(st, st_tr.data(), st_tr.size() * sizeof(double));
 }
 
-void rl::env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end) {
-    py::list nst_or = env.attr("step")(act);
-//    py::print(nst_or);
+void rl::env_step(pybind11::object &env, const int &act, double* nst, double &reward, bool &end) {
+    py::list nst_or = env.attr("step")(action_set[act]);
     py::array_t<double, py::array::c_style | py::array::forcecast> nst_tr(nst_or[0]);
     std::memcpy(nst, nst_tr.data(), nst_tr.size() * sizeof(double));
     reward = py::cast<double>(nst_or[1]);
     end = py::cast<bool>(nst_or[2]);
-//    py::print(nst_or[2]);
-//    cout << "reset" << end  << endl;
 }
 
-rl::rec rl::get_max_action(py::object &env, individual* indi){
+int rl::get_max_action(py::object &env, individual* indi){
     double nst[n_observation]; double reward = 0; bool end = false;
-    double max_v = 0; int max_act = 0; double v = 0;
+    double max_v = -1e6; int max_act = 0; double v;
 
-    // Discrete
-    for (int i = 0; i < n_action; i++){ // env: CartPole <  MountainCar <=
+    for (int i = 0; i < n_action; i++){
         rl::env_step(env, i, nst, reward, end);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
@@ -39,27 +35,8 @@ rl::rec rl::get_max_action(py::object &env, individual* indi){
         env.attr("back_step")();
     }
 
-    // Continuous
-//    for (int i = 0; i <= 10; i++){ // env: CartPole <  MountainCar <=
-//        double act_tmp = rand_real(-1, 1);
-//        rl::env_step(env, act_tmp, nst, reward, end);
-//        v = reward + 1 * individual::calculate(indi->root, nst);
-//        if (v > max_v) {
-//            max_v = v;
-//            max_act = act_tmp;
-//        }
-//        env.attr("back_step")();
-//    }
-
-    rl::rec ans{};
-    ans.a = max_act; ans.v = max_v;
-    return ans;
+    return max_act;
 }
-
-//double rl::cal_target(pybind11::object &env, individual* lgbi){
-//    rec act = rl::get_max_action(env, lgbi);
-//    return act.v;
-//}
 
 template <typename T>
 
@@ -80,11 +57,9 @@ void rl::get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::
         dis_rk[dis_index[i]] = i;
     }
     double _rank;
-//    cout << "rank" << endl;
     for (int i = 0; i < POP_SIZE; i++) {
         _rank = fit_rate * fit_rk[i] + dis_rate * dis_rk[i];
         rank.push_back(_rank);
-//        cout << i << " " << fit_rate << " " << dis_rate << " " << fit_rk[i] << " " << dis_rk[i] << " " << _rank <<  endl;
     }
 }
 
@@ -103,16 +78,13 @@ void rl::display() {
     py::scoped_interpreter guard{};
     py::module::import("sys").attr("argv").attr("append")("");
 
-//    py::object gym = py::module::import("gym");
-//    py::object env = gym.attr("make")(env_name);
-
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
     individual* indi = individual::load_indi("Individual.txt");
 
     auto st = new double [n_observation]; auto nst = new double [n_observation];
-    rl::rec action{}; double reward; bool end;
+    int action; double reward; bool end;
 
     for (int i = 0; i < 100; i++) {
         env.attr("reset_ini")();
@@ -120,7 +92,7 @@ void rl::display() {
         double reward_indi = 0;
         for (int step = 0; step < 1000; step++){
             action = rl::get_max_action(env, indi);
-            rl::env_step(env, action.a, nst, reward, end);
+            rl::env_step(env, action, nst, reward, end);
             std::swap(st, nst);
             if (end) break;
             reward_indi += reward; //env CartPole +1 MountainCar -1
@@ -164,7 +136,7 @@ void rl::rl_op() {
     int best_indi;
 
     auto st = new double [n_observation]; auto nst = new double [n_observation];
-    rec action{}; double reward; bool end;
+    int action; double reward; bool end;
     individual* utnbi; double fitness_utnbi; double lgar; //last generation average reward
     vector<double> rank;
 
@@ -177,7 +149,7 @@ void rl::rl_op() {
         double _fit_tot = 0;
         for (int step = 0; step < 1000; step++){
             action = get_max_action(env, pop[i]);
-            rl::env_step(env, action.a, nst, reward, end);
+            rl::env_step(env, action, nst, reward, end);
             if (end) break;
             _fit_tot += reward;
         }
@@ -212,15 +184,15 @@ void rl::rl_op() {
             for (int step = 0; step < 1000; step++){
                 action = get_max_action(env, pop[i]);
 
-                rl::rec target = rl::get_max_action(env, utnbi);
-                if (action.a == target.a)
+                int action_target = rl::get_max_action(env, utnbi);
+                if (action == action_target)
                     _dis_tot += 1;
                 cnt++;
 
-                rl::env_step(env, action.a, nst, reward, end);
+                rl::env_step(env, action, nst, reward, end);
                 std::swap(st, nst);
                 if (end) break;
-                _fit_tot += reward; //env CartPole +1 MountainCar -1
+                _fit_tot += reward;
             }
             dist.push_back(_dis_tot / cnt);
             fitness.push_back(_fit_tot);
@@ -234,22 +206,12 @@ void rl::rl_op() {
 //            cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
 
-//        double fitness_lgbi = 0;
-//        env_reset(env, st);
-//        for (int step = 0; step < 500; step++){
-//            action = get_max_action(env, lgbi);
-//            rl::env_step(env, action.a, nst, reward, end);
-//            std::swap(st, nst);
-//            if (end) break;
-//            fitness_lgbi += -1;
-//        }
-
         f_a[gen] = fitness_total / double(POP_SIZE);
         d_a[gen] = dist_total / double(POP_SIZE);
         s_a[gen] = size_total / double(POP_SIZE);
 
-        cout << "gen, f_a, s_a, d_a, f_b, utnf_b: ";
-        cout << gen << " " << f_a[gen] << " " << s_a[gen] << " " << d_a[gen] << " ";
+        cout << "gen, f_a, s_a, f_b, utnf_b: ";
+        cout << gen << " " << f_a[gen] << " " << s_a[gen] << " ";
         cout << fitness[best_indi] << " " << fitness_utnbi << endl;
 
         // select rank mode
@@ -262,7 +224,7 @@ void rl::rl_op() {
             fitness_utnbi = fitness[best_indi];
         }
 
-        // method1
+        // improved method
 //        if (f_a[gen] >= lgar) {
 //            if (fitness[best_indi] >= fitness_utnbi) {
 //                delete utnbi;
@@ -274,7 +236,6 @@ void rl::rl_op() {
 //            }
 //            lgar = f_a[gen];
 //        } else {
-//            method1
 //            if (fitness[best_indi] >= fitness_utnbi) {
 //                delete utnbi;
 //                utnbi = new individual(*pop[best_indi]);
@@ -283,14 +244,6 @@ void rl::rl_op() {
 //            } else {
 //                fit_rate = 0.5; dis_rate = 0.5;
 //            }
-
-            //method2
-////            fit_rate = 0.5; dis_rate = 0.5;
-////            if (fitness[best_indi] >= fitness_utnbi) {
-////                delete utnbi;
-////                utnbi = new individual(*pop[best_indi]);
-////                fitness_utnbi = fitness[best_indi];
-////            }
 //
 //            lgar = f_a[gen];
 //        }
@@ -298,7 +251,6 @@ void rl::rl_op() {
         b_i[gen] = fitness_utnbi;
 
         // get rank
-//        cout << "Rank mode: " << fit_rate << " " << dis_rate << endl;
         rank.clear();
         get_rank(rank, fitness, dist, fit_rate, dis_rate);
 

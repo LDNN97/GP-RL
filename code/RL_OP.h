@@ -17,19 +17,10 @@
 #include <numeric>      // std::iota
 #include <algorithm>
 
-const std::string env_name = "CartPoleSwingUp"; // CartPole-v0 or MountainCar-v0 or Pendulum-v0
-const int n_action = 2;
-const int n_observation = 4;
-
 namespace rl{
-    struct rec{
-        int a;
-        double v;
-    };
-
     void env_reset(pybind11::object &env, double* st);
-    void env_step(pybind11::object &env, int &act, double* nst, double &reward, bool &end);
-    rec get_max_action(pybind11::object &env, individual* indi);
+    void env_step(pybind11::object &env, const int &act, double* nst, double &reward, bool &end);
+    int get_max_action(pybind11::object &env, individual* indi);
     double cal_target(pybind11::object &env, individual* lgbi);
     int sample(std::vector<double> &rank);
     void get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate);

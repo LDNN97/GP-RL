@@ -61,20 +61,20 @@ class CartPoleSwingUp(gym.Env):
 
 
     def seed(self, seed=None):
-        np.random.seed(0)
-        self.np_random = np.random
-        # self.np_random, seed = seeding.np_random(seed)
+        # np.random.seed(0)
+        # self.np_random = np.random
+        self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def stateUpdate(self, action, state):
+    def stateUpdate(self, u, state):
         x, x_dot, theta, theta_dot = state
 
         s = math.sin(theta)
         c = math.cos(theta)
 
-        xdot_update = (-2*self.m_p_l*(theta_dot**2)*s + 3*self.m_p*self.g*s*c + 4*action - 4*self.b*x_dot)/(4*self.total_m - 3*self.m_p*c**2)
+        xdot_update = (-2*self.m_p_l*(theta_dot**2)*s + 3*self.m_p*self.g*s*c + 4*u - 4*self.b*x_dot)/(4*self.total_m - 3*self.m_p*c**2)
 
-        thetadot_update = (-3*self.m_p_l*(theta_dot**2)*s*c + 6*self.total_m*self.g*s + 6*(action - self.b*x_dot)*c)/(4*self.l*self.total_m - 3*self.m_p_l*c**2)
+        thetadot_update = (-3*self.m_p_l*(theta_dot**2)*s*c + 6*self.total_m*self.g*s + 6*(u - self.b*x_dot)*c)/(4*self.l*self.total_m - 3*self.m_p_l*c**2)
 
         x = x + x_dot*self.dt
         theta = theta + theta_dot*self.dt
@@ -89,7 +89,8 @@ class CartPoleSwingUp(gym.Env):
         self.t = self.last_t
 
     def step(self, action):
-        force = self.force_mag if action == 1 else -self.force_mag
+        force = -10 + 20 * action
+        # force = self.force_mag if action == 1 else -self.force_mag
 
         self.last_state = self.state
         self.state = self.stateUpdate(force, self.state)
@@ -109,14 +110,9 @@ class CartPoleSwingUp(gym.Env):
         reward_theta = np.cos(theta)
         reward_x = np.cos((x/self.x_threshold)*(np.pi/2.0))
 
-        if reward_theta < 0:
-            reward = 2 * reward_theta * reward_x
-        else:
-            reward = reward_theta * reward_x
+        reward = reward_theta * reward_x
 
-        # reward_theta = (np.cos(theta)+1.0)/2.0
-        # reward_x = np.cos((x/self.x_threshold)*(np.pi/2.0))
-        # reward = reward_theta*reward_x
+        # reward = reward_theta * reward_x
         #reward = (np.cos(theta)+1.0)/2.0
 
         obs = np.array(self.state)
