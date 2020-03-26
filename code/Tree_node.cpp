@@ -4,7 +4,8 @@
 
 #include "Tree_node.h"
 
-using namespace std;
+using namespace tree_node;
+using std::string;
 
 node::node(node* fa, node* l, node* r, int si, int tp, string sym){
     father = fa;
@@ -20,7 +21,7 @@ void node::set_symbol(int tp, string ty){
     symbol = std::move(ty);
 }
 
-double node::cal(double l, double r, const double* xx){
+double node::cal(double l, double r, const t_arr &xx){
     double ans = 0;
     if (symbol == "+") ans = l + r;
     if (symbol == "-") ans = l - r;

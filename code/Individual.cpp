@@ -4,7 +4,7 @@
 
 #include "Individual.h"
 
-using namespace std;
+using namespace indi;
 
 individual::individual(node* pt){
     root = pt;
@@ -27,7 +27,7 @@ node* individual::tree_cpy(node* obj){
     return now;
 }
 
- node* individual::expand(const string &type, int depth, int max_depth){
+ node* individual::expand(const std::string &type, int depth, int max_depth){
     node* now = new node();
 
     if (depth >= max_depth) {
@@ -63,11 +63,11 @@ node* individual::tree_cpy(node* obj){
     return now;
 }
 
-void individual::build(const string &type, int max_depth){
+void individual::build(const std::string &type, int max_depth){
     root = expand(type, 1, max_depth);
 }
 
-double individual::calculate(node* now, double* xx) {
+double individual::calculate(node* now, const t_arr &xx) {
     if (now == nullptr) return 0;
     if (now->type == 0) {
         double l_total = 0, r_total = 0;
@@ -79,14 +79,9 @@ double individual::calculate(node* now, double* xx) {
     }
 }
 
-double individual::cal_fitness(const individual& indi, int num,  double** xx, double* yy){
-    double fitness = 0;
-    for (int i = 0; i < num; i++)
-        fitness += abs(calculate(indi.root, xx[i]) - yy[i]);
-    return fitness;
-}
 
-void individual::show(node* now, vector<item>** pic, int* pos, int depth, int Max_depth){
+
+void individual::show(node* now, std::vector<item>** pic, int* pos, int depth, int Max_depth){
     if (now->type == 1) {
         pic[depth - 1]->push_back(item(pos[depth - 1], now->symbol));
         int number = 1 << (Max_depth - depth);
@@ -107,7 +102,7 @@ int individual::max_depth(node* now) {
     if (now == nullptr) return 0;
     int l_depth = max_depth(now->left);
     int r_depth = max_depth(now->right);
-    return max(l_depth, r_depth) + 1;
+    return std::max(l_depth, r_depth) + 1;
 }
 
 void individual::print_tree(individual* indi){
@@ -115,27 +110,27 @@ void individual::print_tree(individual* indi){
 
     int pos[Max_depth];
     memset(pos, 0, sizeof(pos));
-    auto pic = new vector<item>* [Max_depth];
+    auto pic = new std::vector<item>* [Max_depth];
     for (int i = 0; i < Max_depth; i++)
-        pic[i] = new vector<item>;
+        pic[i] = new std::vector<item>;
 
     individual::show(indi->root, pic, pos, 1, Max_depth);
 
     for (int i = 0; i < Max_depth; i++) {
         if (pic[i]->size() == 1) {
             if ((*pic[i])[0].first > 0)
-                for (int k = 0; k < (*pic[i])[0].first; k++) cout << " ";
-            cout << (*pic[i])[0].second << endl;
+                for (int k = 0; k < (*pic[i])[0].first; k++) std::cout << " ";
+            std::cout << (*pic[i])[0].second << std::endl;
         } else{
             int last = int(pic[i]->size()) - 1;
             for (int j = 0; j < last; j++) {
                 if (j == 0 && (*pic[i])[j].first > 0)
-                    for (int k = 0; k < (*pic[i])[j].first; k++) cout << " ";
-                cout << (*pic[i])[j].second;
+                    for (int k = 0; k < (*pic[i])[j].first; k++) std::cout << " ";
+                std::cout << (*pic[i])[j].second;
                 int whitespace_number = (*pic[i])[j + 1].first - (*pic[i])[j].first - 1;
-                for (int k = 0; k < whitespace_number; k++) cout << " ";
+                for (int k = 0; k < whitespace_number; k++) std::cout << " ";
             }
-            cout << (*pic[i])[last].second << endl;
+            std::cout << (*pic[i])[last].second << std::endl;
         }
 
     }
@@ -186,8 +181,8 @@ void individual::crossover(individual* another){
 //    cout << cross_node2 << endl;
 
     if (cross_node1->father == nullptr && cross_node2->father == nullptr) {
-        swap(cross_node1, cross_node2);
-        swap(root, another->root);
+        std::swap(cross_node1, cross_node2);
+        std::swap(root, another->root);
     }else if (cross_node1->father == nullptr) {
         if (cross_node2->father->left == cross_node2)
             cross_node2->father->left = cross_node1;
@@ -213,7 +208,7 @@ void individual::crossover(individual* another){
             cross_node2->father->left = cross_node1;
         else
             cross_node2->father->right = cross_node1;
-        swap(cross_node1->father, cross_node2->father);
+        std::swap(cross_node1->father, cross_node2->father);
     }
 
 //    cout << "parent1 tree size and cross_node1 subtree size" << endl;
@@ -250,7 +245,7 @@ void individual::mutation(individual* indi){
 
 //    cout << depth << " " << sub_tree_depth << endl;
 
-    string type;
+    std::string type;
     if (rand_real(0, 1) < 0.9)
         type = "grow";
     else
@@ -282,17 +277,17 @@ void individual::clean(node* now){
 typedef std::pair<int, int> rela;
 typedef std::pair<int, rela> link;
 
-void individual::save_indi(node* now, const string& file_name){
-    ofstream file(file_name);
-    file << now->size << endl;
+void individual::save_indi(node* now, const std::string& file_name){
+    std::ofstream file(file_name);
+    file << now->size << std::endl;
 
-    vector<link> tree;
+    std::vector<link> tree;
     node* que[now->size + 5];
     int f_ptr = 0, b_ptr = 1;
     que[0] = now;
 
     file << 0 << " " <<
-        que[0]->size << " " << que[0]->type << " " << que[0]->symbol << endl;
+        que[0]->size << " " << que[0]->type << " " << que[0]->symbol << std::endl;
 
     while (f_ptr < b_ptr){
         if (que[f_ptr]->left != nullptr) {
@@ -300,7 +295,7 @@ void individual::save_indi(node* now, const string& file_name){
             que[b_ptr] = que[f_ptr]->left;
 
             file << b_ptr << " " <<
-                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << endl;
+                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << std::endl;
 
             b_ptr += 1;
         }
@@ -309,7 +304,7 @@ void individual::save_indi(node* now, const string& file_name){
             que[b_ptr] = que[f_ptr]->right;
 
             file << b_ptr << " " <<
-                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << endl;
+                que[b_ptr]->size << " " << que[b_ptr]->type << " " << que[b_ptr]->symbol << std::endl;
 
             b_ptr += 1;
         }
@@ -317,18 +312,18 @@ void individual::save_indi(node* now, const string& file_name){
     }
 
     for (auto item : tree)
-        file << item.first << " " << item.second.first << " " << item.second.second << endl;
+        file << item.first << " " << item.second.first << " " << item.second.second << std::endl;
 
     file.close();
 }
 
-individual* individual::load_indi(const string& file_name){
+individual* individual::load_indi(const std::string& file_name){
     int size;
-    ifstream file(file_name);
+    std::ifstream file(file_name);
     file >> size;
 
     node* nodes[size];
-    int id, si, ty; string str;
+    int id, si, ty; std::string str;
     for (int i = 0; i < size; i++) {
         file >> id >> si >> ty >> str;
         node* now = new node(nullptr, nullptr, nullptr, si, ty, str);
