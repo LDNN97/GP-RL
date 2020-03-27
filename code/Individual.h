@@ -40,7 +40,8 @@ namespace indi{
         static void mutation(individual* indi);
 
         // free pointer
-        static void clean(node* now);
+        static void tree_clean(node* now);
+        static void indi_clean(individual* indi);
 
         // save model
         static void save_indi(node* now, const std::string& file_name);

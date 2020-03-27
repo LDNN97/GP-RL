@@ -5,7 +5,15 @@
 #include "RL_OP.h"
 
 namespace py = pybind11;
-using namespace std;
+using namespace rl;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::vector;
+using std::swap;
+using std::ofstream;
+using std::ifstream;
+using std::string;
 
 void rl::env_reset(py::object &env, state_arr &st){
     py::object st_or = env.attr("reset")();
@@ -70,21 +78,18 @@ int rl::sample(vector<double> &rank){
     return ans;
 }
 
-void rl::display() {
-    cout << "Display the result" << endl;
-
-    py::scoped_interpreter guard{};
-    py::module::import("sys").attr("argv").attr("append")("");
+void rl::best_agent() {
+    cout << "Display the Best Agent" << endl;
 
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
-    individual* indi = individual::load_indi("Individual.txt");
+    individual* indi = individual::load_indi("Agent/best_agent.txt");
 
     std::array<double, n_observation> st{}, nst{};
     int action; double reward; bool end;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 10; i++) {
         env.attr("reset_ini")();
         rl::env_reset(env, st);
         double reward_indi = 0;
@@ -100,17 +105,79 @@ void rl::display() {
     }
     env.attr("close")();
 
-    individual::clean(indi->root);
-    delete indi;
+    individual::indi_clean(indi);
+}
+
+int ensemble_selection(py::object &env, vector<individual*> &agent) {
+    std::array<int, n_action> box{};
+
+    for (auto indi:agent) {
+        state_arr nst{}; double reward = 0; bool end = false;
+        double max_v = -1e6; int max_act = 0; double v;
+        for (int i = 0; i < n_action; i++){
+            rl::env_step(env, i, nst, reward, end);
+            v = reward + 1 * individual::calculate(indi->root, nst);
+            if (v > max_v) {
+                max_v = v;
+                max_act = i;
+            }
+            env.attr("back_step")();
+        }
+        box[max_act]++;
+    }
+
+    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
+
+    return ans;
+}
+
+void rl::ensemble_agent() {
+    cout << "Display the Ensemble Agent" << endl;
+
+    py::object env_list = py::module::import("env");
+    py::object env = env_list.attr(env_name.c_str())();
+
+    int ensemble_size = 0;
+    ifstream _file("Agent/ensemble_size.txt");
+    _file >> ensemble_size;
+    _file.close();
+
+    vector<individual*> agent;
+    for (int i = 0; i < ensemble_size; i++) {
+        string _f_name = "Agent/agent.txt";
+        string num = std::to_string(i);
+        _f_name.insert(11, num);
+        individual* indi = individual::load_indi(_f_name);
+        agent.emplace_back(indi);
+    }
+
+    std::array<double, n_observation> st{}, nst{};
+    int action; double reward; bool end;
+
+    for (int i = 0; i < 10; i++) {
+        env.attr("reset_ini")();
+        rl::env_reset(env, st);
+        double reward_indi = 0;
+        for (int step = 0; step < 1000; step++){
+            action = ensemble_selection(env, agent);
+            rl::env_step(env, action, nst, reward, end);
+            std::swap(st, nst);
+            if (end) break;
+            reward_indi += reward; //env CartPole +1 MountainCar -1
+            env.attr("render")();
+        }
+        cout << reward_indi << endl;
+    }
+    env.attr("close")();
+
+    for (auto indi:agent)
+        individual::indi_clean(indi);
+    agent.clear();
 }
 
 //Todo: 1. restart 2. best individual with low robustness
-
 void rl::rl_op() {
     // GYM
-    py::scoped_interpreter guard{};
-    py::module::import("sys").attr("argv").attr("append")("");
-
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
@@ -149,10 +216,13 @@ void rl::rl_op() {
     std::array<double, MAX_GENERATION> sim_a {};
     std::array<double, MAX_GENERATION> siz_a {};
 
-
     utnbi = nullptr;
     fitness_utnbi = 0;
     lgar = -1e6;
+
+    // emsemble learning
+    double fit_utnbg = -1e6;
+    vector<individual*> agent;
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
@@ -193,15 +263,27 @@ void rl::rl_op() {
 
 //            cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
+        f_a[gen] = fitness_total / double(POP_SIZE);
+        sim_a[gen] = sim_total / double(POP_SIZE);
+        siz_a[gen] = size_total / double(POP_SIZE);
 
         if (utnbi == nullptr) {
             utnbi = new individual(*pop[best_indi]);
             fitness_utnbi = fitness[best_indi];
         }
 
-        f_a[gen] = fitness_total / double(POP_SIZE);
-        sim_a[gen] = sim_total / double(POP_SIZE);
-        siz_a[gen] = size_total / double(POP_SIZE);
+        // emsemble learning
+        if (f_a[gen] >= fit_utnbg) {
+            for (auto indi:agent)
+                individual::indi_clean(indi);
+            agent.clear();
+            for (int i = 0; i < POP_SIZE; i++)
+                if (fitness[i] > f_a[gen]){
+                    auto tmp = new individual(*pop[i]);
+                    agent.emplace_back(tmp);
+                }
+            fit_utnbg = f_a[gen];
+        }
 
         cout << "gen, f_a, s_a, f_b, utnf_b: ";
         cout << gen << " " << f_a[gen] << " " << siz_a[gen] << " ";
@@ -263,28 +345,41 @@ void rl::rl_op() {
             individual::mutation(parent1);
 
             new_pop[i] = parent1;
-            individual::clean(parent2->root);
-            delete parent2;
+            individual::indi_clean(parent2);
         }
 
         swap(pop, new_pop);
 
         // free pointer;
-        for (int i = 0; i < POP_SIZE; i++) {
-            individual::clean(new_pop[i]->root);
-            delete new_pop[i];
-        }
+        for (int i = 0; i < POP_SIZE; i++)
+            individual::indi_clean(new_pop[i]);
         delete [] new_pop;
 
+
         // save best model
-        individual::save_indi(utnbi->root, "Individual.txt");
+        individual::save_indi(utnbi->root, "Agent/best_agent.txt");
+        // save ensemble agent
+        ofstream _file("Agent/ensemble_size.txt");
+        _file << agent.size() << endl;
+        _file.close();
+        for (int i = 0; i < agent.size(); i++) {
+            string _f_name = "Agent/agent.txt";
+            string num = std::to_string(i);
+            _f_name.insert(11, num);
+            individual::save_indi(agent[i]->root, _f_name);
+        }
+
+        if (gen % 20 == 0) {
+            best_agent();
+            ensemble_agent();
+        }
     }
 
     // print the average fit and dist
-    ofstream file("Average.txt");
+    ofstream _file("Average.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
-        file << i << " " << f_b[i] << " " << f_a[i] << " " << siz_a[i] << endl;
-    file.close();
+        _file << i << " " << f_b[i] << " " << f_a[i] << " " << siz_a[i] << endl;
+    _file.close();
 
     // print
     py::object _b_i = py::cast(f_b);
@@ -303,10 +398,7 @@ void rl::rl_op() {
 
     plt.attr("show")();
 
-    for (int i = 0; i < POP_SIZE; i++) {
-        individual::clean(pop[i]->root);
-        delete pop[i];
-    }
+    for (int i = 0; i < POP_SIZE; i++)
+        individual::indi_clean(pop[i]);
     delete [] pop;
-
 }

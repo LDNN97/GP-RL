@@ -253,25 +253,30 @@ void individual::mutation(individual* indi){
 
     if (mutation_node->father == nullptr){
         indi->root = expand(type, depth, depth + sub_tree_depth - 1);
-        clean(mutation_node);
+        tree_clean(mutation_node);
     }else {
         if (mutation_node->father->left == mutation_node)
             mutation_node->father->left = expand(type, depth, depth + sub_tree_depth - 1);
         else
             mutation_node->father->right = expand(type, depth, depth + sub_tree_depth - 1);
         size_update(mutation_node->father);
-        clean(mutation_node);
+        tree_clean(mutation_node);
     }
 
     delete [] seq1;
 }
 
 // free pointer
-void individual::clean(node* now){
+void individual::tree_clean(node* now){
     if (now == nullptr) return;
-    clean(now->left);
-    clean(now->right);
+    tree_clean(now->left);
+    tree_clean(now->right);
     delete now;
+}
+
+void individual::indi_clean(individual* indi){
+    tree_clean(indi->root);
+    delete indi;
 }
 
 typedef std::pair<int, int> rela;

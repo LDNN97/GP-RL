@@ -27,7 +27,8 @@ namespace rl{
     int sample(std::vector<double> &rank);
     void get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate);
     void rl_op();
-    void display();
+    void best_agent();
+    void ensemble_agent();
 }
 
 #endif //GPRL_CPP_RL_OP_H
