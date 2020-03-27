@@ -14,6 +14,7 @@ using std::swap;
 using std::ofstream;
 using std::ifstream;
 using std::string;
+using std::priority_queue;
 
 void rl::env_reset(py::object &env, state_arr &st){
     py::object st_or = env.attr("reset")();
@@ -175,6 +176,35 @@ void rl::ensemble_agent() {
     agent.clear();
 }
 
+void rl::agent_push(pri_que &agent, individual* indi, double fit){
+    if (agent.empty()) {
+        auto tmp = new individual(*indi);
+        agent.push(agent_pair(tmp, fit));
+    }
+    else {
+        agent_pair top = agent.top();
+        if (top.second <= fit) {
+            auto tmp = new individual(*indi);
+            agent.push(agent_pair(tmp, fit));
+        }
+        if (agent.size() > ENSEMBLE_SIZE) {
+            auto tmp = agent.top();
+            individual::indi_clean(tmp.first);
+            agent.pop();
+        }
+    }
+}
+
+void rl::agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
+    agent_array.clear();
+    while (!agent.empty()){
+        agent_array.emplace_back(agent.top());
+        agent.pop();
+    }
+    for (auto indi : agent_array)
+        agent.push(indi);
+}
+
 //Todo: 1. restart 2. best individual with low robustness
 void rl::rl_op() {
     // GYM
@@ -215,14 +245,15 @@ void rl::rl_op() {
     std::array<double, MAX_GENERATION> f_a {};
     std::array<double, MAX_GENERATION> sim_a {};
     std::array<double, MAX_GENERATION> siz_a {};
+    std::array<double, MAX_GENERATION/20> f_ens {};
 
     utnbi = nullptr;
     fitness_utnbi = 0;
     lgar = -1e6;
 
     // emsemble learning
-    double fit_utnbg = -1e6;
-    vector<individual*> agent;
+    pri_que agent;
+    vector<agent_pair> agent_array;
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
@@ -260,7 +291,7 @@ void rl::rl_op() {
             size_total += pop[i]->root->size;
 
             best_indi = (fitness[best_indi] > fitness[i]) ? best_indi : i;
-
+            rl::agent_push(agent, pop[i], fitness[i]);
 //            cout << i << " " << fitness[i] << " " << dist[i] << endl;
         }
         f_a[gen] = fitness_total / double(POP_SIZE);
@@ -270,19 +301,6 @@ void rl::rl_op() {
         if (utnbi == nullptr) {
             utnbi = new individual(*pop[best_indi]);
             fitness_utnbi = fitness[best_indi];
-        }
-
-        // emsemble learning
-        if (f_a[gen] >= fit_utnbg) {
-            for (auto indi:agent)
-                individual::indi_clean(indi);
-            agent.clear();
-            for (int i = 0; i < POP_SIZE; i++)
-                if (fitness[i] > f_a[gen]){
-                    auto tmp = new individual(*pop[i]);
-                    agent.emplace_back(tmp);
-                }
-            fit_utnbg = f_a[gen];
         }
 
         cout << "gen, f_a, s_a, f_b, utnf_b: ";
@@ -355,21 +373,28 @@ void rl::rl_op() {
             individual::indi_clean(new_pop[i]);
         delete [] new_pop;
 
-
-        // save best model
-        individual::save_indi(utnbi->root, "Agent/best_agent.txt");
-        // save ensemble agent
-        ofstream _file("Agent/ensemble_size.txt");
-        _file << agent.size() << endl;
-        _file.close();
-        for (int i = 0; i < agent.size(); i++) {
-            string _f_name = "Agent/agent.txt";
-            string num = std::to_string(i);
-            _f_name.insert(11, num);
-            individual::save_indi(agent[i]->root, _f_name);
-        }
-
         if (gen % 20 == 0) {
+            // save best model
+            individual::save_indi(utnbi->root, "Agent/best_agent.txt");
+            // save ensemble agent
+            agent_flat(agent, agent_array);
+
+            ofstream _file("Agent/ensemble_size.txt");
+            _file << agent_array.size() << endl;
+            _file.close();
+
+            double fit_ens = 0;
+            for (int i = 0; i < agent_array.size(); i++) {
+                string _f_name = "Agent/agent.txt";
+                string num = std::to_string(i);
+                _f_name.insert(11, num);
+                individual::save_indi(agent_array[i].first->root, _f_name);
+                fit_ens += agent_array[i].second;
+            }
+            fit_ens /= double(agent_array.size());
+            f_ens[gen/20] = fit_ens;
+
+            cout << "Best and Ensemble: " << fitness_utnbi << " " << fit_ens << endl;
             best_agent();
             ensemble_agent();
         }
@@ -378,24 +403,26 @@ void rl::rl_op() {
     // print the average fit and dist
     ofstream _file("Average.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
-        _file << i << " " << f_b[i] << " " << f_a[i] << " " << siz_a[i] << endl;
+        _file << i << " " << f_b[i] << " " << f_ens[i/20] << " " << f_a[i] << " " << siz_a[i] << endl;
     _file.close();
 
     // print
     py::object _b_i = py::cast(f_b);
+    py::object _f_ens = py::cast(f_ens);
     py::object _f_a = py::cast(f_a);
     py::object _siz_a = py::cast(siz_a);
+
     py::object plt = py::module::import("matplotlib.pyplot");
     plt.attr("figure")();
-
-    plt.attr("subplot")(311);
+    plt.attr("subplot")(411);
     plt.attr("plot")(_b_i);
-    plt.attr("subplot")(312);
+    plt.attr("subplot")(412);
+    plt.attr("plot")(_f_ens);
+    plt.attr("subplot")(413);
     plt.attr("plot")(_f_a);
-    plt.attr("subplot")(313);
+    plt.attr("subplot")(414);
     plt.attr("plot")(_siz_a);
     plt.attr("yscale")("log");
-
     plt.attr("show")();
 
     for (int i = 0; i < POP_SIZE; i++)
