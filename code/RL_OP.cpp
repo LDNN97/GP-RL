@@ -109,29 +109,6 @@ void rl::best_agent() {
     individual::indi_clean(indi);
 }
 
-int ensemble_selection(py::object &env, vector<individual*> &agent) {
-    std::array<int, n_action> box{};
-
-    for (auto indi:agent) {
-        state_arr nst{}; double reward = 0; bool end = false;
-        double max_v = -1e6; int max_act = 0; double v;
-        for (int i = 0; i < n_action; i++){
-            rl::env_step(env, i, nst, reward, end);
-            v = reward + 1 * individual::calculate(indi->root, nst);
-            if (v > max_v) {
-                max_v = v;
-                max_act = i;
-            }
-            env.attr("back_step")();
-        }
-        box[max_act]++;
-    }
-
-    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
-
-    return ans;
-}
-
 void rl::ensemble_agent() {
     cout << "Display the Ensemble Agent" << endl;
 
@@ -205,6 +182,53 @@ void rl::agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
         agent.push(indi);
 }
 
+int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
+    std::array<int, n_action> box{};
+
+    for (auto indi:agent) {
+        state_arr nst{}; double reward = 0; bool end = false;
+        double max_v = -1e6; int max_act = 0; double v;
+        for (int i = 0; i < n_action; i++){
+            rl::env_step(env, i, nst, reward, end);
+            v = reward + 1 * individual::calculate(indi->root, nst);
+            if (v > max_v) {
+                max_v = v;
+                max_act = i;
+            }
+            env.attr("back_step")();
+        }
+        box[max_act]++;
+    }
+
+    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
+
+    return ans;
+}
+
+int rl::ensemble_selection(py::object &env, vector<agent_pair> &agent) {
+    std::array<int, n_action> box{};
+
+    for (auto indi:agent) {
+        state_arr nst{}; double reward = 0; bool end = false;
+        double max_v = -1e6; int max_act = 0; double v;
+        for (int i = 0; i < n_action; i++){
+            rl::env_step(env, i, nst, reward, end);
+            v = reward + 1 * individual::calculate(indi.first->root, nst);
+            if (v > max_v) {
+                max_v = v;
+                max_act = i;
+            }
+            env.attr("back_step")();
+        }
+        box[max_act]++;
+    }
+
+    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
+
+    return ans;
+}
+
+
 //Todo: 1. restart 2. best individual with low robustness
 void rl::rl_op() {
     // GYM
@@ -273,7 +297,8 @@ void rl::rl_op() {
                 action = get_max_action(env, pop[i]);
 
                 if (utnbi != nullptr) {
-                    int action_target = rl::get_max_action(env, utnbi);
+                    agent_flat(agent, agent_array);
+                    int action_target = rl::ensemble_selection(env, agent_array);
                     if (action == action_target)
                         _same_tot += 1;
                 }
@@ -301,51 +326,39 @@ void rl::rl_op() {
         if (utnbi == nullptr) {
             utnbi = new individual(*pop[best_indi]);
             fitness_utnbi = fitness[best_indi];
+        }else{
+            if (fitness[best_indi] >= fitness_utnbi) {
+                individual::indi_clean(utnbi);
+                utnbi = new individual(*pop[best_indi]);
+                fitness_utnbi = fitness[best_indi];
+            }
         }
+        f_b[gen] = fitness_utnbi;
 
-        cout << "gen, f_a, s_a, f_b, utnf_b: ";
-        cout << gen << " " << f_a[gen] << " " << siz_a[gen] << " ";
-        cout << fitness[best_indi] << " " << fitness_utnbi << endl;
+
 
         // select rank mode
-        double fit_rate = 1, dis_rate = 0;
-
-        // original
-        if (fitness[best_indi] >= fitness_utnbi) {
-            delete utnbi;
-            utnbi = new individual(*pop[best_indi]);
-            fitness_utnbi = fitness[best_indi];
-        }
+        double fit_rate = 1, sim_rate = 0;
 
         // improved method
-//        if (f_a[gen] >= lgar) {
-//            if (fitness[best_indi] >= fitness_utnbi) {
-//                delete utnbi;
-//                utnbi = new individual(*pop[best_indi]);
-//                fitness_utnbi = fitness[best_indi];
-//                fit_rate = 1; dis_rate = 0;
-//            } else {
-//                fit_rate = 0.7; dis_rate = 0.3;
-//            }
-//            lgar = f_a[gen];
-//        } else {
-//            if (fitness[best_indi] >= fitness_utnbi) {
-//                delete utnbi;
-//                utnbi = new individual(*pop[best_indi]);
-//                fitness_utnbi = fitness[best_indi];
-//                fit_rate = 0.3; dis_rate = 0.7;
-//            } else {
-//                fit_rate = 0.5; dis_rate = 0.5;
-//            }
-//
-//            lgar = f_a[gen];
-//        }
-
-        f_b[gen] = fitness_utnbi;
+        if (f_a[gen] >= lgar) {
+            if (f_b[gen] > agent.top().second) {
+                fit_rate = 1; sim_rate = 0;
+            } else {
+                fit_rate = 0.7; sim_rate = 0.3;
+            }
+        } else {
+            if (f_b[gen] > agent.top().second) {
+                fit_rate = 0.3; sim_rate = 0.7;
+            } else {
+                fit_rate = 0.5; sim_rate = 0.5;
+            }
+        }
+        lgar = f_a[gen];
 
         // get rank
         rank.clear();
-        get_rank(rank, fitness, sim, fit_rate, dis_rate);
+        get_rank(rank, fitness, sim, fit_rate, sim_rate);
 
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
 //            cout << "=====successfully!======" << endl;
@@ -372,6 +385,11 @@ void rl::rl_op() {
         for (int i = 0; i < POP_SIZE; i++)
             individual::indi_clean(new_pop[i]);
         delete [] new_pop;
+
+        // record
+        cout << "gen, f_a, s_a, f_b, utnf_b, fit_rate, sim_rate: ";
+        cout << gen << " " << f_a[gen] << " " << siz_a[gen] << " ";
+        cout << fitness[best_indi] << " " <<  f_b[gen] << " " << fit_rate << " " << sim_rate << endl;
 
         if (gen % 20 == 0) {
             // save best model
