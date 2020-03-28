@@ -342,14 +342,10 @@ void rl::rl_op() {
 
         // improved method
         if (f_a[gen] >= lgar) {
-            if (f_b[gen] > agent.top().second) {
-                fit_rate = 1; sim_rate = 0;
-            } else {
-                fit_rate = 0.7; sim_rate = 0.3;
-            }
+            fit_rate = 1; sim_rate =0;
         } else {
             if (f_b[gen] > agent.top().second) {
-                fit_rate = 0.3; sim_rate = 0.7;
+                fit_rate = 0.7; sim_rate = 0.3;
             } else {
                 fit_rate = 0.5; sim_rate = 0.5;
             }
@@ -391,7 +387,7 @@ void rl::rl_op() {
         cout << gen << " " << f_a[gen] << " " << siz_a[gen] << " ";
         cout << fitness[best_indi] << " " <<  f_b[gen] << " " << fit_rate << " " << sim_rate << endl;
 
-        if (gen % 20 == 0) {
+        if ((gen+1) % 50 == 0) {
             // save best model
             individual::save_indi(utnbi->root, "Agent/best_agent.txt");
             // save ensemble agent
@@ -413,8 +409,8 @@ void rl::rl_op() {
             f_ens[gen/20] = fit_ens;
 
             cout << "Best and Ensemble: " << fitness_utnbi << " " << fit_ens << endl;
-            best_agent();
-            ensemble_agent();
+//            best_agent();
+//            ensemble_agent();
         }
     }
 
