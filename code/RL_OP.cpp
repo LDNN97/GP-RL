@@ -5,7 +5,6 @@
 
 #include "RL_OP.h"
 #include "spdlog/spdlog.h"
-#include "taskflow/taskflow.hpp"
 
 namespace py = pybind11;
 using namespace rl;
@@ -231,10 +230,6 @@ void rl::rl_op() {
     // emsemble learning
     pri_que agent;
 
-    // parallel design
-    tf::Executor executor;
-    tf::Taskflow taskflow;
-
     env.attr("reset_ini")();
     auto [_fit, _sim] = evaluate(env, pop[0], agent);
     agent_push(agent, pop[0], _fit);
@@ -249,13 +244,11 @@ void rl::rl_op() {
         std::array<double, POP_SIZE> fit{};
         std::array<double, POP_SIZE> sim{};
 
-        // parallel
-        taskflow.clear();
+        // ready for parallel
         for (int i = 0; i < POP_SIZE; i++) {
             auto [_fit, _sim] = evaluate(env, pop[i], agent);
             fit[i] = _fit; sim[i] = _sim;
         }
-        executor.run(taskflow).get();
 
         for (int i = 0; i < POP_SIZE; i++) {
             sim_total += sim[i];
