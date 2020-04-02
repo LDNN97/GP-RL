@@ -16,35 +16,24 @@ using std::ifstream;
 using std::string;
 using std::priority_queue;
 
-void rl::env_reset(py::object &env, state_arr &st){
-    py::object st_or = env.attr("reset")();
-    st = st_or.cast<state_arr>();
-}
-
-void rl::env_step(pybind11::object &env, const int &act, state_arr &nst, double &reward, bool &end) {
-    py::list nst_or = env.attr("step")(action_set[act]);
-    nst = py::cast<state_arr>(nst_or[0]);
-    reward = py::cast<double>(nst_or[1]);
-    end = py::cast<bool>(nst_or[2]);
-}
-
-int rl::get_max_action(py::object &env, individual* indi){
-    state_arr nst{}; double reward = 0; bool end = false;
+int rl::get_max_action(CartPoleSwingUp &env, individual* indi){
+    state_arr nst{};
     double max_v = -1e6; int max_act = 0; double v;
 
     for (int i = 0; i < n_action; i++){
-        rl::env_step(env, i, nst, reward, end);
+        auto [nst, reward, end] = env.step(action_set[i]);
         v = reward + 1 * individual::calculate(indi->root, nst);
         if (v > max_v) {
             max_v = v;
             max_act = i;
         }
-        env.attr("back_step")();
+        env.back_step();
     }
 
     return max_act;
 }
 
+// Rank
 template <typename T>
 
 vector<size_t> sort_indexes(const std::array<T, POP_SIZE> &v) {
@@ -71,6 +60,7 @@ void get_rank(std::vector<double> &rank, std::array<double, POP_SIZE> &fit, std:
     }
 }
 
+// Tournament Selection
 int sample(vector<double> &rank){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
@@ -99,7 +89,7 @@ void agent_push(pri_que &agent, individual* indi, double fit){
     }
 }
 
-int rl::ensemble_selection(py::object &env, pri_que &agent) {
+int rl::ensemble_selection(CartPoleSwingUp &env, pri_que &agent) {
     vector<agent_pair> agent_array;
     while (!agent.empty()){
         agent_array.emplace_back(agent.top());
@@ -110,16 +100,16 @@ int rl::ensemble_selection(py::object &env, pri_que &agent) {
     std::array<int, n_action> box{};
 
     for (auto indi : agent_array) {
-        state_arr nst{}; double reward = 0; bool end = false;
+        state_arr nst{};
         double max_v = -1e6; int max_act = 0; double v;
         for (int i = 0; i < n_action; i++){
-            rl::env_step(env, i, nst, reward, end);
+            auto [nst, reward, end] = env.step(action_set[i]);
             v = reward + 1 * individual::calculate(indi.first->root, nst);
             if (v > max_v) {
                 max_v = v;
                 max_act = i;
             }
-            env.attr("back_step")();
+            env.back_step();
         }
         box[max_act]++;
     }
@@ -129,11 +119,11 @@ int rl::ensemble_selection(py::object &env, pri_que &agent) {
     return ans;
 }
 
-std::tuple<double, double> evaluate(py::object env, individual* &indi, pri_que &agent){
-    std::array<double, n_observation> st{}, nst{};
-    int action; int action_target; double reward; bool end;
+std::tuple<double, double> evaluate(CartPoleSwingUp env, individual* &indi, pri_que &agent){
+    std::array<double, n_observation> nst{};
+    int action; int action_target;
 
-    env_reset(env, st);
+    env.reset();
     int cnt = 0;
     double sim = 0;
     double fit = 0;
@@ -147,8 +137,7 @@ std::tuple<double, double> evaluate(py::object env, individual* &indi, pri_que &
                 sim += 1;
         }
 
-        rl::env_step(env, action, nst, reward, end);
-        st = nst;
+        auto [nst, reward, end] = env.step(action_set[action]);
         if (end) break;
         fit += reward;
     }
@@ -183,9 +172,7 @@ void model_save(individual* &indi_utnb, pri_que &agent){
 
 // Todo: restart strategy
 void rl::rl_op() {
-    // GYM
-    py::object env_list = py::module::import("env");
-    py::object env = env_list.attr(env_name.c_str())();
+    auto env = CartPoleSwingUp();
 
     // build a model
     auto pop = new individual* [POP_SIZE];
@@ -230,13 +217,13 @@ void rl::rl_op() {
     // emsemble learning
     pri_que agent;
 
-    env.attr("reset_ini")();
+    env.reset_ini();
     auto [_fit, _sim] = evaluate(env, pop[0], agent);
     agent_push(agent, pop[0], _fit);
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
-        env.attr("reset_ini")();
+        env.reset_ini();
         auto new_pop = new individual* [POP_SIZE];
 
         indi_best = 0; fit_total = 0; sim_total = 0; size_total = 0;

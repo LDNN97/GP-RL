@@ -11,6 +11,35 @@ using std::ifstream;
 using std::string;
 using std::vector;
 
+void rl::env_reset(py::object &env, state_arr &st){
+    py::object st_or = env.attr("reset")();
+    st = st_or.cast<state_arr>();
+}
+
+void rl::env_step(pybind11::object &env, const int &act, state_arr &nst, double &reward, bool &end) {
+    py::list nst_or = env.attr("step")(action_set[act]);
+    nst = py::cast<state_arr>(nst_or[0]);
+    reward = py::cast<double>(nst_or[1]);
+    end = py::cast<bool>(nst_or[2]);
+}
+
+int rl::get_max_action(py::object &env, individual* indi){
+    state_arr nst{}; double reward = 0; bool end = false;
+    double max_v = -1e6; int max_act = 0; double v;
+
+    for (int i = 0; i < n_action; i++){
+        rl::env_step(env, i, nst, reward, end);
+        v = reward + 1 * individual::calculate(indi->root, nst);
+        if (v > max_v) {
+            max_v = v;
+            max_act = i;
+        }
+        env.attr("back_step")();
+    }
+
+    return max_act;
+}
+
 int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
     std::array<int, n_action> box{};
 
@@ -35,6 +64,9 @@ int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
 }
 
 void rl::best_agent() {
+    pybind11::scoped_interpreter guard{};
+    pybind11::module::import("sys").attr("argv").attr("append")("");
+
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
@@ -63,6 +95,9 @@ void rl::best_agent() {
 }
 
 void rl::ensemble_agent() {
+    pybind11::scoped_interpreter guard{};
+    pybind11::module::import("sys").attr("argv").attr("append")("");
+
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 

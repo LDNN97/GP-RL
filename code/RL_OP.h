@@ -7,6 +7,7 @@
 
 #include "Individual.h"
 #include "Random.h"
+#include "CartPoleSwingUp.h"
 
 #include <array>
 #include <iostream>
@@ -29,12 +30,15 @@ namespace rl{
     };
     typedef std::priority_queue<agent_pair, std::vector<agent_pair>, cmp> pri_que;
 
+    // Train
+    int get_max_action(CartPoleSwingUp &env, individual* indi);
+    int ensemble_selection(CartPoleSwingUp &env, pri_que &agent);
+    void rl_op();
+
+    // Display();
     void env_reset(pybind11::object &env, state_arr &st);
     void env_step(pybind11::object &env, const int &act, state_arr &nst, double &reward, bool &end);
     int get_max_action(pybind11::object &env, individual* indi);
-    int ensemble_selection(pybind11::object &env, pri_que &agent);
-    void rl_op();
-
     int ensemble_selection(pybind11::object &env, std::vector<individual*> &agent);
     void best_agent();
     void ensemble_agent();
