@@ -2,12 +2,12 @@
 // Created by LDNN97 on 2020/3/5.
 //
 
+
 #include "RL_OP.h"
+#include "spdlog/spdlog.h"
 
 namespace py = pybind11;
 using namespace rl;
-using std::cin;
-using std::cout;
 using std::endl;
 using std::vector;
 using std::swap;
@@ -47,30 +47,31 @@ int rl::get_max_action(py::object &env, individual* indi){
 
 template <typename T>
 
-vector<size_t> sort_indexes(const vector<T> &v) {
+vector<size_t> sort_indexes(const std::array<T, POP_SIZE> &v) {
     vector<size_t> idx(v.size());
     iota(idx.begin(), idx.end(), 0);
     stable_sort(idx.begin(), idx.end(), [&v](size_t i1, size_t i2) {return v[i1] < v[i2];});
     return idx;
 }
 
-void rl::get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate ) {
-    auto fit_index = sort_indexes(fitness);
-    auto dis_index = sort_indexes(dist);
+void get_rank(std::vector<double> &rank, std::array<double, POP_SIZE> &fit, std::array<double, POP_SIZE> &sim,
+                  double fit_rate, double sim_rate) {
+    auto fit_index = sort_indexes(fit);
+    auto dis_index = sort_indexes(sim);
     std::array<double, POP_SIZE> fit_rk {};
-    std::array<double, POP_SIZE> dis_rk {};
+    std::array<double, POP_SIZE> sim_rk {};
     for (int i = 0; i < POP_SIZE; i++) {
         fit_rk[fit_index[i]] = i;
-        dis_rk[dis_index[i]] = i;
+        sim_rk[dis_index[i]] = i;
     }
     double _rank;
     for (int i = 0; i < POP_SIZE; i++) {
-        _rank = fit_rate * fit_rk[i] + dis_rate * dis_rk[i];
+        _rank = fit_rate * fit_rk[i] + sim_rate * sim_rk[i];
         rank.push_back(_rank);
     }
 }
 
-int rl::sample(vector<double> &rank){
+int sample(vector<double> &rank){
     int ans = rand_int(0, POP_SIZE);
     for (int i = 0; i < T_S - 1; i++) {
         int tmp = rand_int(0, POP_SIZE);
@@ -79,81 +80,7 @@ int rl::sample(vector<double> &rank){
     return ans;
 }
 
-void rl::best_agent() {
-    cout << "Display the Best Agent" << endl;
-
-    py::object env_list = py::module::import("env");
-    py::object env = env_list.attr(env_name.c_str())();
-
-    individual* indi = individual::load_indi("Agent/best_agent.txt");
-
-    std::array<double, n_observation> st{}, nst{};
-    int action; double reward; bool end;
-
-    for (int i = 0; i < 10; i++) {
-        env.attr("reset_ini")();
-        rl::env_reset(env, st);
-        double reward_indi = 0;
-        for (int step = 0; step < 1000; step++){
-            action = rl::get_max_action(env, indi);
-            rl::env_step(env, action, nst, reward, end);
-            std::swap(st, nst);
-            if (end) break;
-            reward_indi += reward; //env CartPole +1 MountainCar -1
-            env.attr("render")();
-        }
-        cout << reward_indi << endl;
-    }
-    env.attr("close")();
-
-    individual::indi_clean(indi);
-}
-
-void rl::ensemble_agent() {
-    cout << "Display the Ensemble Agent" << endl;
-
-    py::object env_list = py::module::import("env");
-    py::object env = env_list.attr(env_name.c_str())();
-
-    int ensemble_size = 0;
-    ifstream _file("Agent/ensemble_size.txt");
-    _file >> ensemble_size;
-    _file.close();
-
-    vector<individual*> agent;
-    for (int i = 0; i < ensemble_size; i++) {
-        string _f_name = "Agent/agent.txt";
-        string num = std::to_string(i);
-        _f_name.insert(11, num);
-        individual* indi = individual::load_indi(_f_name);
-        agent.emplace_back(indi);
-    }
-
-    std::array<double, n_observation> st{}, nst{};
-    int action; double reward; bool end;
-
-    for (int i = 0; i < 10; i++) {
-        env.attr("reset_ini")();
-        rl::env_reset(env, st);
-        double reward_indi = 0;
-        for (int step = 0; step < 1000; step++){
-            action = ensemble_selection(env, agent);
-            rl::env_step(env, action, nst, reward, end);
-            std::swap(st, nst);
-            if (end) break;
-            reward_indi += reward; //env CartPole +1 MountainCar -1
-            env.attr("render")();
-        }
-        cout << reward_indi << endl;
-    }
-    env.attr("close")();
-
-    for (auto indi:agent)
-        individual::indi_clean(indi);
-    agent.clear();
-}
-
-void rl::agent_push(pri_que &agent, individual* indi, double fit){
+void agent_push(pri_que &agent, individual* indi, double fit){
     if (agent.empty()) {
         auto tmp = new individual(*indi);
         agent.push(agent_pair(tmp, fit));
@@ -172,43 +99,17 @@ void rl::agent_push(pri_que &agent, individual* indi, double fit){
     }
 }
 
-void rl::agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
-    agent_array.clear();
+int rl::ensemble_selection(py::object &env, pri_que &agent) {
+    vector<agent_pair> agent_array;
     while (!agent.empty()){
         agent_array.emplace_back(agent.top());
         agent.pop();
     }
-    for (auto indi : agent_array)
-        agent.push(indi);
-}
+    for (auto indi : agent_array) agent.push(indi);
 
-int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
     std::array<int, n_action> box{};
 
-    for (auto indi:agent) {
-        state_arr nst{}; double reward = 0; bool end = false;
-        double max_v = -1e6; int max_act = 0; double v;
-        for (int i = 0; i < n_action; i++){
-            rl::env_step(env, i, nst, reward, end);
-            v = reward + 1 * individual::calculate(indi->root, nst);
-            if (v > max_v) {
-                max_v = v;
-                max_act = i;
-            }
-            env.attr("back_step")();
-        }
-        box[max_act]++;
-    }
-
-    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
-
-    return ans;
-}
-
-int rl::ensemble_selection(py::object &env, vector<agent_pair> &agent) {
-    std::array<int, n_action> box{};
-
-    for (auto indi:agent) {
+    for (auto indi : agent_array) {
         state_arr nst{}; double reward = 0; bool end = false;
         double max_v = -1e6; int max_act = 0; double v;
         for (int i = 0; i < n_action; i++){
@@ -228,8 +129,59 @@ int rl::ensemble_selection(py::object &env, vector<agent_pair> &agent) {
     return ans;
 }
 
+std::tuple<double, double> evaluate(py::object env, individual* &indi, pri_que &agent){
+    std::array<double, n_observation> st{}, nst{};
+    int action; int action_target; double reward; bool end;
 
-//Todo: 1. restart 2. best individual with low robustness
+    env_reset(env, st);
+    int cnt = 0;
+    double sim = 0;
+    double fit = 0;
+    for (int step = 0; step < 1000; step++){
+        cnt++;
+        action = get_max_action(env, indi);
+
+        if (!agent.empty()) {
+            action_target = rl::ensemble_selection(env, agent);
+            if (action == action_target)
+                sim += 1;
+        }
+
+        rl::env_step(env, action, nst, reward, end);
+        st = nst;
+        if (end) break;
+        fit += reward;
+    }
+    sim /= double(cnt);
+
+    return std::make_tuple(fit, sim);
+}
+
+void model_save(individual* &indi_utnb, pri_que &agent){
+    // save best model
+    individual::save_indi(indi_utnb->root, "Agent/best_agent.txt");
+
+    // agent flat
+    vector<agent_pair> agent_array;
+    while (!agent.empty()){
+        agent_array.emplace_back(agent.top());
+        agent.pop();
+    }
+    for (auto indi : agent_array) agent.push(indi);
+
+    ofstream _file("Agent/ensemble_size.txt");
+    _file << agent_array.size() << endl;
+    _file.close();
+
+    for (int i = 0; i < agent_array.size(); i++) {
+        string _f_name = "Agent/agent.txt";
+        string num = std::to_string(i);
+        _f_name.insert(11, num);
+        individual::save_indi(agent_array[i].first->root, _f_name);
+    }
+}
+
+// Todo: restart strategy
 void rl::rl_op() {
     // GYM
     py::object env_list = py::module::import("env");
@@ -248,21 +200,21 @@ void rl::rl_op() {
         }
     }
 
+    // size
+    double size_total;
+
     // fitness
-    vector<double> fitness;
-    vector<double> rank;
-    double fitness_total, size_total;
-    int best_indi;
-    individual* utnbi; double fitness_utnbi;
-    double lgar; //last generation average reward
+    double fit_total;
+    double fit_utnbi;
+    double fit_lgar; //last generation average reward
+    int indi_best;
+    individual* indi_utnb; // up to now best
 
     // similarity between individauls
-    vector<double> sim;
     double sim_total;
 
-    // RL: state, next state, action, reward, end
-    std::array<double, n_observation> st{}, nst{};
-    int action; double reward; bool end;
+    // rank
+    vector<double> rank;
 
     // record the evolution process
     std::array<double, MAX_GENERATION> f_b {};
@@ -271,90 +223,78 @@ void rl::rl_op() {
     std::array<double, MAX_GENERATION> siz_a {};
     std::array<double, MAX_GENERATION/20> f_ens {};
 
-    utnbi = nullptr;
-    fitness_utnbi = 0;
-    lgar = -1e6;
+    indi_utnb = nullptr;
+    fit_utnbi = 0;
+    fit_lgar = -1e6;
 
     // emsemble learning
     pri_que agent;
-    vector<agent_pair> agent_array;
+
+    env.attr("reset_ini")();
+    auto [_fit, _sim] = evaluate(env, pop[0], agent);
+    agent_push(agent, pop[0], _fit);
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
         env.attr("reset_ini")();
         auto new_pop = new individual* [POP_SIZE];
 
-        best_indi = 0; fitness_total = 0; sim_total = 0; size_total = 0;
-        fitness.clear(); sim.clear();
+        indi_best = 0; fit_total = 0; sim_total = 0; size_total = 0;
+
+        std::array<double, POP_SIZE> fit{};
+        std::array<double, POP_SIZE> sim{};
+
+        // parallel
+        for (int i = 0; i < POP_SIZE; i++) {
+            auto [_fit, _sim] = evaluate(env, pop[i], agent);
+            fit[i] = _fit; _sim = _sim;
+        }
 
         for (int i = 0; i < POP_SIZE; i++) {
-            env_reset(env, st);
-            int cnt = 0;
-            double _same_tot = 0;
-            double _fit_tot = 0;
-            for (int step = 0; step < 1000; step++){
-                cnt++;
-                action = get_max_action(env, pop[i]);
-
-                if (utnbi != nullptr) {
-                    agent_flat(agent, agent_array);
-                    int action_target = rl::ensemble_selection(env, agent_array);
-                    if (action == action_target)
-                        _same_tot += 1;
-                }
-
-                rl::env_step(env, action, nst, reward, end);
-                st = nst;
-                if (end) break;
-                _fit_tot += reward;
-            }
-            sim.push_back(_same_tot / cnt);
-            fitness.push_back(_fit_tot);
-
             sim_total += sim[i];
-            fitness_total += fitness[i];
+            fit_total += fit[i];
             size_total += pop[i]->root->size;
-
-            best_indi = (fitness[best_indi] > fitness[i]) ? best_indi : i;
-            rl::agent_push(agent, pop[i], fitness[i]);
-//            cout << i << " " << fitness[i] << " " << dist[i] << endl;
+            indi_best = (fit[indi_best] > fit[i]) ? indi_best : i;
+            agent_push(agent, pop[i], fit[i]);
         }
-        f_a[gen] = fitness_total / double(POP_SIZE);
+
+        f_a[gen] = fit_total / double(POP_SIZE);
         sim_a[gen] = sim_total / double(POP_SIZE);
         siz_a[gen] = size_total / double(POP_SIZE);
 
-        if (utnbi == nullptr) {
-            utnbi = new individual(*pop[best_indi]);
-            fitness_utnbi = fitness[best_indi];
+        if (indi_utnb == nullptr) {
+            indi_utnb = new individual(*pop[indi_best]);
+            fit_utnbi = fit[indi_best];
         }else{
-            if (fitness[best_indi] >= fitness_utnbi) {
-                individual::indi_clean(utnbi);
-                utnbi = new individual(*pop[best_indi]);
-                fitness_utnbi = fitness[best_indi];
+            if (fit[indi_best] >= fit_utnbi) {
+                individual::indi_clean(indi_utnb);
+                indi_utnb = new individual(*pop[indi_best]);
+                fit_utnbi = fit[indi_best];
             }
         }
-        f_b[gen] = fitness_utnbi;
+        f_b[gen] = fit_utnbi;
 
+        // rank mode
+        double fit_rate, sim_rate;
 
-
-        // select rank mode
-        double fit_rate = 1, sim_rate = 0;
+        // original method
+//        fit_rate = 1; sim_rate = 0;
 
         // improved method
-        if (f_a[gen] >= lgar) {
+        if (f_a[gen] >= fit_lgar) {
             fit_rate = 1; sim_rate =0;
         } else {
-            if (f_b[gen] > agent.top().second) {
+            if (fit[indi_best] > agent.top().second) {
                 fit_rate = 0.7; sim_rate = 0.3;
             } else {
                 fit_rate = 0.5; sim_rate = 0.5;
             }
         }
-        lgar = f_a[gen];
+        fit_lgar = f_a[gen];
 
         // get rank
         rank.clear();
-        get_rank(rank, fitness, sim, fit_rate, sim_rate);
+        get_rank(rank, fit, sim, fit_rate, sim_rate);
 
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
 //            cout << "=====successfully!======" << endl;
@@ -383,39 +323,16 @@ void rl::rl_op() {
         delete [] new_pop;
 
         // record
-        cout << "gen, f_a, s_a, f_b, utnf_b, fit_rate, sim_rate: ";
-        cout << gen << " " << f_a[gen] << " " << siz_a[gen] << " ";
-        cout << fitness[best_indi] << " " <<  f_b[gen] << " " << fit_rate << " " << sim_rate << endl;
+        spdlog::info("Gen: {:<4d} f_b: {:<8.3f} f_a: {:<8.3f} s_a: {:<6.1f} "
+                     "r_f: {:<3.1f} r_s: {:<3.1f} "
+                     "f_utnb: {:<8.3f} f_ens_min: {:<8.3f}", gen, fit[indi_best], f_a[gen], siz_a[gen],
+                     fit_rate, sim_rate, f_b[gen], agent.top().second);
 
-        if ((gen+1) % 50 == 0) {
-            // save best model
-            individual::save_indi(utnbi->root, "Agent/best_agent.txt");
-            // save ensemble agent
-            agent_flat(agent, agent_array);
-
-            ofstream _file("Agent/ensemble_size.txt");
-            _file << agent_array.size() << endl;
-            _file.close();
-
-            double fit_ens = 0;
-            for (int i = 0; i < agent_array.size(); i++) {
-                string _f_name = "Agent/agent.txt";
-                string num = std::to_string(i);
-                _f_name.insert(11, num);
-                individual::save_indi(agent_array[i].first->root, _f_name);
-                fit_ens += agent_array[i].second;
-            }
-            fit_ens /= double(agent_array.size());
-            f_ens[gen/20] = fit_ens;
-
-            cout << "Best and Ensemble: " << fitness_utnbi << " " << fit_ens << endl;
-//            best_agent();
-//            ensemble_agent();
-        }
+        if ((gen+1) % 50 == 0) model_save(indi_utnb, agent);
     }
 
     // print the average fit and dist
-    ofstream _file("Average.txt");
+    ofstream _file("Result.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
         _file << i << " " << f_b[i] << " " << f_ens[i/20] << " " << f_a[i] << " " << siz_a[i] << endl;
     _file.close();

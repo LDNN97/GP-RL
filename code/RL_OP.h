@@ -32,15 +32,13 @@ namespace rl{
     void env_reset(pybind11::object &env, state_arr &st);
     void env_step(pybind11::object &env, const int &act, state_arr &nst, double &reward, bool &end);
     int get_max_action(pybind11::object &env, individual* indi);
-    int sample(std::vector<double> &rank);
-    void get_rank(std::vector<double> &rank, std::vector<double> &fitness, std::vector<double> &dist, double fit_rate, double dis_rate);
+    int ensemble_selection(pybind11::object &env, pri_que &agent);
     void rl_op();
+
+    int ensemble_selection(pybind11::object &env, std::vector<individual*> &agent);
     void best_agent();
     void ensemble_agent();
-    void agent_push(pri_que &agent, individual* indi, double fit);
-    void agent_flat(pri_que &agent, std::vector<agent_pair> &agent_array);
-    int ensemble_selection(pybind11::object &env, std::vector<individual*> &agent);
-    int ensemble_selection(pybind11::object &env, std::vector<agent_pair> &agent);
+
 }
 
 #endif //GPRL_CPP_RL_OP_H
