@@ -247,7 +247,7 @@ void rl::rl_op() {
         // parallel
         for (int i = 0; i < POP_SIZE; i++) {
             auto [_fit, _sim] = evaluate(env, pop[i], agent);
-            fit[i] = _fit; _sim = _sim;
+            fit[i] = _fit; sim[i] = _sim;
         }
 
         for (int i = 0; i < POP_SIZE; i++) {
