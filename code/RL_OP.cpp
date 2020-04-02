@@ -252,12 +252,8 @@ void rl::rl_op() {
         // parallel
         taskflow.clear();
         for (int i = 0; i < POP_SIZE; i++) {
-            auto item = taskflow.emplace([&fit, &sim, env, &pop, &agent, i]() {
-                auto[_fit, _sim] = evaluate(env, pop[i], agent);
-                fit[i] = _fit;
-                sim[i] = _sim;
-            });
-            item.name(std::to_string(i));
+            auto [_fit, _sim] = evaluate(env, pop[i], agent);
+            fit[i] = _fit; sim[i] = _sim;
         }
         executor.run(taskflow).get();
 
