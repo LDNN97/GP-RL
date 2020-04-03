@@ -7,6 +7,7 @@
 using namespace arma;
 
 CartPoleSwingUp::CartPoleSwingUp() {
+    arma_rng::set_seed(0);
     state_ini = {0, 0, datum::pi, 0};
     vec delta = {-0.2, -0.2, -0.2, -0.2};
     state_ini += (delta + 0.4 * randu(4));

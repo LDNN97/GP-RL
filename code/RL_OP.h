@@ -31,8 +31,8 @@ namespace rl{
     typedef std::priority_queue<agent_pair, std::vector<agent_pair>, cmp> pri_que;
 
     // Train
-    int get_max_action(CartPoleSwingUp &env, individual* indi);
-    int ensemble_selection(CartPoleSwingUp &env, pri_que &agent);
+    int get_max_action(CartPoleSwingUp &env, const individual* indi);
+    int ensemble_selection(CartPoleSwingUp &env, std::vector<agent_pair> &agent);
     void rl_op();
 
     // Display();

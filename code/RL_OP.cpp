@@ -5,6 +5,7 @@
 
 #include "RL_OP.h"
 #include "spdlog/spdlog.h"
+#include "taskflow/taskflow.hpp"
 
 namespace py = pybind11;
 using namespace rl;
@@ -16,7 +17,7 @@ using std::ifstream;
 using std::string;
 using std::priority_queue;
 
-int rl::get_max_action(CartPoleSwingUp &env, individual* indi){
+int rl::get_max_action(CartPoleSwingUp &env, const individual* indi){
     state_arr nst{};
     double max_v = -1e6; int max_act = 0; double v;
 
@@ -31,6 +32,80 @@ int rl::get_max_action(CartPoleSwingUp &env, individual* indi){
     }
 
     return max_act;
+}
+
+int rl::ensemble_selection(CartPoleSwingUp &env, vector<agent_pair> &agent_array) {
+    std::array<int, n_action> box{};
+
+    for (int i = 0; i < agent_array.size(); i++) {
+        state_arr nst{};
+        double max_v = -1e6; int max_act = 0; double v;
+        for (double j : action_set){
+            auto [nst, reward, end] = env.step(j);
+            v = reward + 1 * individual::calculate(agent_array[i].first->root, nst);
+            if (v > max_v) {
+                max_v = v;
+                max_act = i;
+            }
+            env.back_step();
+        }
+        box[max_act]++;
+    }
+
+    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
+
+    return ans;
+}
+
+void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &agent, double &fit, double &sim){
+    std::array<double, n_observation> nst{};
+    int action; int action_target;
+
+    env.reset();
+    int cnt = 0;
+    double _fit = 0, _sim = 0;
+    for (int step = 0; step < 1000; step++){
+        cnt++;
+        action = get_max_action(env, indi);
+
+        action_target = rl::ensemble_selection(env, agent);
+        if (action == action_target)
+            _sim += 1;
+
+        auto [nst, reward, end] = env.step(action_set[action]);
+        if (end) break;
+        _fit += reward;
+    }
+    _sim /= double(cnt);
+
+    fit = _fit; sim = _sim;
+}
+
+void agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
+    while (!agent.empty()){
+        agent_array.emplace_back(agent.top());
+        agent.pop();
+    }
+    for (auto indi : agent_array) agent.push(indi);
+}
+
+void agent_push(pri_que &agent, individual* indi, double fit){
+    if (agent.empty()) {
+        auto tmp = new individual(*indi);
+        agent.push(agent_pair(tmp, fit));
+    }
+    else {
+        agent_pair top = agent.top();
+        if (top.second <= fit) {
+            auto tmp = new individual(*indi);
+            agent.push(agent_pair(tmp, fit));
+        }
+        if (agent.size() > ENSEMBLE_SIZE) {
+            auto tmp = agent.top();
+            individual::indi_clean(tmp.first);
+            agent.pop();
+        }
+    }
 }
 
 // Rank
@@ -70,93 +145,13 @@ int sample(vector<double> &rank){
     return ans;
 }
 
-void agent_push(pri_que &agent, individual* indi, double fit){
-    if (agent.empty()) {
-        auto tmp = new individual(*indi);
-        agent.push(agent_pair(tmp, fit));
-    }
-    else {
-        agent_pair top = agent.top();
-        if (top.second <= fit) {
-            auto tmp = new individual(*indi);
-            agent.push(agent_pair(tmp, fit));
-        }
-        if (agent.size() > ENSEMBLE_SIZE) {
-            auto tmp = agent.top();
-            individual::indi_clean(tmp.first);
-            agent.pop();
-        }
-    }
-}
-
-int rl::ensemble_selection(CartPoleSwingUp &env, pri_que &agent) {
-    vector<agent_pair> agent_array;
-    while (!agent.empty()){
-        agent_array.emplace_back(agent.top());
-        agent.pop();
-    }
-    for (auto indi : agent_array) agent.push(indi);
-
-    std::array<int, n_action> box{};
-
-    for (auto indi : agent_array) {
-        state_arr nst{};
-        double max_v = -1e6; int max_act = 0; double v;
-        for (int i = 0; i < n_action; i++){
-            auto [nst, reward, end] = env.step(action_set[i]);
-            v = reward + 1 * individual::calculate(indi.first->root, nst);
-            if (v > max_v) {
-                max_v = v;
-                max_act = i;
-            }
-            env.back_step();
-        }
-        box[max_act]++;
-    }
-
-    int ans = std::distance(box.begin(), std::max_element(box.begin(), box.end()));
-
-    return ans;
-}
-
-std::tuple<double, double> evaluate(CartPoleSwingUp env, individual* &indi, pri_que &agent){
-    std::array<double, n_observation> nst{};
-    int action; int action_target;
-
-    env.reset();
-    int cnt = 0;
-    double sim = 0;
-    double fit = 0;
-    for (int step = 0; step < 1000; step++){
-        cnt++;
-        action = get_max_action(env, indi);
-
-        if (!agent.empty()) {
-            action_target = rl::ensemble_selection(env, agent);
-            if (action == action_target)
-                sim += 1;
-        }
-
-        auto [nst, reward, end] = env.step(action_set[action]);
-        if (end) break;
-        fit += reward;
-    }
-    sim /= double(cnt);
-
-    return std::make_tuple(fit, sim);
-}
-
 void model_save(individual* &indi_utnb, pri_que &agent){
     // save best model
     individual::save_indi(indi_utnb->root, "Agent/best_agent.txt");
 
     // agent flat
     vector<agent_pair> agent_array;
-    while (!agent.empty()){
-        agent_array.emplace_back(agent.top());
-        agent.pop();
-    }
-    for (auto indi : agent_array) agent.push(indi);
+    agent_flat(agent, agent_array);
 
     ofstream _file("Agent/ensemble_size.txt");
     _file << agent_array.size() << endl;
@@ -217,9 +212,14 @@ void rl::rl_op() {
     // emsemble learning
     pri_que agent;
 
+    // parallel design
+    tf::Executor executor;
+    tf::Taskflow taskflow;
+    auto observer = executor.make_observer<tf::ExecutorObserver>();
+    std::ofstream ofs("timestamps.json");
+
     env.reset_ini();
-    auto [_fit, _sim] = evaluate(env, pop[0], agent);
-    agent_push(agent, pop[0], _fit);
+    agent_push(agent, pop[0], -1e6);
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
@@ -231,11 +231,24 @@ void rl::rl_op() {
         std::array<double, POP_SIZE> fit{};
         std::array<double, POP_SIZE> sim{};
 
-        // ready for parallel
+        vector<agent_pair> agent_array;
+        agent_flat(agent, agent_array);
+
+        // single
+//        for (int i = 0; i < POP_SIZE; i++)
+//            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+
+        // parallel
+        taskflow.clear();
         for (int i = 0; i < POP_SIZE; i++) {
-            auto [_fit, _sim] = evaluate(env, pop[i], agent);
-            fit[i] = _fit; sim[i] = _sim;
+            auto item = taskflow.emplace([&fit, &sim, env, pop, &agent_array, i]() {
+                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+            });
+            item.name(std::to_string(i));
         }
+        executor.run(taskflow);
+        executor.wait_for_all();
+        observer->dump(ofs);
 
         for (int i = 0; i < POP_SIZE; i++) {
             sim_total += sim[i];
