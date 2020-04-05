@@ -1,5 +1,5 @@
-#include "RL_OP.h"
-#include "CartPoleSwingUp.h"
+#include "include/RL_OP.h"
+#include "include/CartPoleSwingUp.h"
 int main() {
     rl::rl_op();
 //    rl::best_agent();

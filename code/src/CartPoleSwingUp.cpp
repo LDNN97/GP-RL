@@ -2,7 +2,7 @@
 // Created by LDNN97 on 2020/4/2.
 //
 
-#include "CartPoleSwingUp.h"
+#include "../include/CartPoleSwingUp.h"
 
 using namespace arma;
 

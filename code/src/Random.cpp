@@ -2,7 +2,7 @@
 // Created by LDNN97 on 2020/3/1.
 //
 
-#include "Random.h"
+#include "../include/Random.h"
 
 using namespace std;
 

@@ -2,7 +2,7 @@
 // Created by LDNN97 on 2020/3/1.
 //
 
-#include "Tree_node.h"
+#include "../include/Tree_node.h"
 
 using namespace tree_node;
 using std::string;
