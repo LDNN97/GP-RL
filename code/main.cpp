@@ -2,6 +2,7 @@
 #include "include/CartPoleSwingUp.h"
 
 int main() {
+    // Training
     double succ_rate = 0;
     std::array<rl::result_item, MAX_GENERATION> result{};
     for (int i = 0; i < EXP_NUM; i++){
@@ -18,7 +19,11 @@ int main() {
             << result[i].f_b / double(EXP_NUM) << " " << result[i].f_ens / double(EXP_NUM) << std::endl;
     _file.close();
 
-//    rl::best_agent();
-//    rl::ensemble_agent();
+    // Display
+//    std::string _pre = "EXP ";
+//    std::string num = std::to_string(0); // set 0 to EXP_NUM
+//    _pre.insert(4, num);
+//    _pre += " ";
+//    rl::display(_pre);
 }
 

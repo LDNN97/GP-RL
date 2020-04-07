@@ -34,18 +34,18 @@ int rl::get_max_action(CartPoleSwingUp &env, const individual* indi){
     return max_act;
 }
 
-int rl::ensemble_selection(CartPoleSwingUp &env, vector<agent_pair> &agent_array) {
+int rl::ensemble_selection(CartPoleSwingUp &env, const vector<agent_pair> &agent_array) {
     std::array<int, n_action> box{};
 
-    for (int i = 0; i < agent_array.size(); i++) {
+    for (auto indi : agent_array) {
         state_arr nst{};
         double max_v = -1e6; int max_act = 0; double v;
-        for (double j : action_set){
-            auto [nst, reward, end] = env.step(j);
-            v = reward + 1 * individual::calculate(agent_array[i].first->root, nst);
+        for (int j = 0; j < n_action; j++){
+            auto [nst, reward, end] = env.step(action_set[j]);
+            v = reward + 1 * individual::calculate(indi.first->root, nst);
             if (v > max_v) {
                 max_v = v;
-                max_act = i;
+                max_act = j;
             }
             env.back_step();
         }
@@ -57,7 +57,7 @@ int rl::ensemble_selection(CartPoleSwingUp &env, vector<agent_pair> &agent_array
     return ans;
 }
 
-void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &agent, double &fit, double &sim, double &fit_ens){
+void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pair> &agent, double &fit, double &sim){
     std::array<double, n_observation> nst{};
     int action; int action_target;
 
@@ -78,6 +78,13 @@ void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &a
     }
     _sim /= double(cnt);
 
+    fit = _fit; sim = _sim;
+}
+
+void evaluate_ens(CartPoleSwingUp &env, const vector<agent_pair> &agent, double &fit_ens){
+    std::array<double, n_observation> nst{};
+    int action;
+
     env.reset();
     double _fit_ens = 0;
     for (int step = 0; step < 1000; step++){
@@ -86,11 +93,13 @@ void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &a
         _fit_ens += reward;
         if (end) break;
     }
-
-    fit = _fit; sim = _sim; fit_ens = _fit_ens;
+    fit_ens = _fit_ens;
 }
 
+
+
 void agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
+    agent_array.clear();
     while (!agent.empty()){
         agent_array.emplace_back(agent.top());
         agent.pop();
@@ -174,7 +183,6 @@ void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent
     }
 }
 
-// Todo: restart strategy
 void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
     auto env = CartPoleSwingUp();
 
@@ -191,22 +199,6 @@ void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_it
         }
     }
 
-    // size
-    double size_total;
-
-    // fitness
-    double fit_total;
-    double fit_utnbi;
-    double fit_lgar; //last generation average reward
-    int indi_best;
-    individual* indi_utnb; // up to now best
-
-    // similarity between individauls
-    double sim_total;
-
-    // rank
-    vector<double> rank;
-
     // record the evolution process
     std::array<double, MAX_GENERATION> f_a {};
     std::array<double, MAX_GENERATION> f_b {};
@@ -216,45 +208,39 @@ void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_it
     std::array<double, MAX_GENERATION> sim_a {};
     std::array<double, MAX_GENERATION> siz_a {};
 
-    indi_utnb = nullptr;
-    fit_utnbi = 0;
-    fit_lgar = -1e6;
-
-    // emsemble learning
-    pri_que agent;
-
     // parallel design
     tf::Executor executor;
     tf::Taskflow taskflow;
     auto observer = executor.make_observer<tf::ExecutorObserver>();
 
-
+    // initialize
     env.reset_ini();
+    auto indi_utnb = new individual(*pop[0]);
+    pri_que agent;
     agent_push(agent, pop[0], -1e6);
+    double fit_utnbi = -1e6;
+    double fit_lgar = -1e6;
 
     //Evolution
     for (int gen = 0; gen < MAX_GENERATION; gen++) {
         env.reset_ini();
-        auto new_pop = new individual* [POP_SIZE];
-
-        indi_best = 0; fit_total = 0; sim_total = 0; size_total = 0;
 
         std::array<double, POP_SIZE> fit{};
         std::array<double, POP_SIZE> sim{};
-        std::array<double, POP_SIZE> fit_ens{};
-
         vector<agent_pair> agent_array;
         agent_flat(agent, agent_array);
 
         // single
-//        for (int i = 0; i < POP_SIZE; i++)
+//        for (int i = 0; i < POP_SIZE; i++) {
+//            env.reset();
 //            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+//        }
 
         // parallel
         taskflow.clear();
         for (int i = 0; i < POP_SIZE; i++) {
-            auto item = taskflow.emplace([&fit, &sim, &fit_ens, env, pop, &agent_array, i]() {
-                evaluate(env, pop[i], agent_array, fit[i], sim[i], fit_ens[i]);
+            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
+                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
             });
             item.name(std::to_string(i));
         }
@@ -268,53 +254,45 @@ void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_it
 //            ofs.close();
 //        }
 
+        evaluate_ens(env, agent_array, f_ens[gen]);
+
+        int indi_best = 0;
         for (int i = 0; i < POP_SIZE; i++) {
-            sim_total += sim[i];
-            fit_total += fit[i];
-            size_total += pop[i]->root->size;
+            f_a[gen] += fit[i] / double(POP_SIZE);
+            sim_a[gen] += sim[i] / double(POP_SIZE);
+            siz_a[gen] += (double) pop[i]->root->size / double(POP_SIZE);
             indi_best = (fit[indi_best] > fit[i]) ? indi_best : i;
             agent_push(agent, pop[i], fit[i]);
         }
-
-        f_a[gen] = fit_total / double(POP_SIZE);
-        f_b[gen] = fit[indi_best];
-        f_ens[gen] = fit_ens[indi_best];
-        sim_a[gen] = sim_total / double(POP_SIZE);
-        siz_a[gen] = size_total / double(POP_SIZE);
-
-
-        if (indi_utnb == nullptr) {
+        if (fit[indi_best] >= fit_utnbi) {
+            individual::indi_clean(indi_utnb);
             indi_utnb = new individual(*pop[indi_best]);
             fit_utnbi = fit[indi_best];
-        }else{
-            if (fit[indi_best] >= fit_utnbi) {
-                individual::indi_clean(indi_utnb);
-                indi_utnb = new individual(*pop[indi_best]);
-                fit_utnbi = fit[indi_best];
-            }
         }
+        f_b[gen] = fit[indi_best];
         f_utnb[gen] = fit_utnbi;
 
         // rank mode
         double fit_rate, sim_rate;
 
         // original method
-//        fit_rate = 1; sim_rate = 0;
+        fit_rate = 1; sim_rate = 0;
 
         // improved method
-        if (f_a[gen] >= fit_lgar) {
-            fit_rate = 1; sim_rate =0;
-        } else {
-            if (fit[indi_best] > agent.top().second) {
-                fit_rate = 0.7; sim_rate = 0.3;
-            } else {
-                fit_rate = 0.5; sim_rate = 0.5;
-            }
-        }
-        fit_lgar = f_a[gen];
+//        if (f_a[gen] >= fit_lgar) {
+//            fit_rate = 1; sim_rate =0;
+//        } else {
+//            if (fit[indi_best] > agent.top().second) {
+//                fit_rate = 0.7; sim_rate = 0.3;
+//            } else {
+//                fit_rate = 0.5; sim_rate = 0.5;
+//            }
+//        }
+//        fit_lgar = f_a[gen];
 
         // get rank
-        rank.clear();
+        // rank
+        vector<double> rank;
         get_rank(rank, fit, sim, fit_rate, sim_rate);
 
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
@@ -322,6 +300,8 @@ void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_it
 //            cout << endl;
 //            break;
 //        }
+
+        auto new_pop = new individual* [POP_SIZE];
 
         for (int i = 0; i < POP_SIZE; i++) {
             int index_p1 = sample(rank);
@@ -345,15 +325,15 @@ void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_it
 
         // record
         spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} "
-                     "s_a: {:<6.1f} sim_a: {:<6.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f}",
+                     "s_a: {:<6.1f} sim_a: {:<6.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f}, top: {:<8.3f}",
                      gen, f_a[gen], f_b[gen], f_ens[gen],
-                     siz_a[gen], sim_a[gen], fit_rate, sim_rate, f_utnb[gen]);
+                     siz_a[gen], sim_a[gen], fit_rate, sim_rate, f_utnb[gen], agent_array[0].second);
 
         result[gen].f_a += f_a[gen];
         result[gen].f_b += f_b[gen];
-        result[gen].f_ens = f_ens[gen];
+        result[gen].f_ens += f_ens[gen];
 
-        if ((gen+1) % 5 == 0) model_save(_pre, indi_utnb, agent);
+        if ((gen+1) % 50 == 0) model_save(_pre, indi_utnb, agent);
     }
 
     // print the average fit and dist

@@ -63,19 +63,16 @@ int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
     return ans;
 }
 
-void rl::best_agent() {
-    pybind11::scoped_interpreter guard{};
-    pybind11::module::import("sys").attr("argv").attr("append")("");
-
+void rl::best_agent(const std::string & _pre) {
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
-    individual* indi = individual::load_indi("Agent/best_agent.txt");
+    individual* indi = individual::load_indi("Agent/" + _pre + "best_agent.txt");
 
     std::array<double, n_observation> st{}, nst{};
     int action; double reward; bool end;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         env.attr("reset_ini")();
         rl::env_reset(env, st);
         double reward_indi = 0;
@@ -94,23 +91,20 @@ void rl::best_agent() {
     individual::indi_clean(indi);
 }
 
-void rl::ensemble_agent() {
-    pybind11::scoped_interpreter guard{};
-    pybind11::module::import("sys").attr("argv").attr("append")("");
-
+void rl::ensemble_agent(const std::string & _pre) {
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
 
     int ensemble_size = 0;
-    ifstream _file("Agent/ensemble_size.txt");
+    ifstream _file("Agent/" + _pre + "ensemble_size.txt");
     _file >> ensemble_size;
     _file.close();
 
     vector<individual*> agent;
     for (int i = 0; i < ensemble_size; i++) {
-        string _f_name = "Agent/agent.txt";
+        string _f_name = "Agent/" + _pre + "agent.txt";
         string num = std::to_string(i);
-        _f_name.insert(11, num);
+        _f_name.insert(_f_name.length() - 4, num);
         individual* indi = individual::load_indi(_f_name);
         agent.emplace_back(indi);
     }
@@ -118,7 +112,7 @@ void rl::ensemble_agent() {
     std::array<double, n_observation> st{}, nst{};
     int action; double reward; bool end;
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         env.attr("reset_ini")();
         rl::env_reset(env, st);
         double reward_indi = 0;
@@ -139,4 +133,12 @@ void rl::ensemble_agent() {
     agent.clear();
 }
 
+void rl::display(const std::string & _pre){
+    pybind11::scoped_interpreter guard{};
+    pybind11::module::import("sys").attr("argv").attr("append")("");
+    spdlog::info("Display Best Agent:");
+    rl::best_agent(_pre);
+    spdlog::info("Display Ensemble Agent:");
+    rl::ensemble_agent(_pre);
+}
 
