@@ -57,7 +57,7 @@ int rl::ensemble_selection(CartPoleSwingUp &env, vector<agent_pair> &agent_array
     return ans;
 }
 
-void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &agent, double &fit, double &sim){
+void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &agent, double &fit, double &sim, double &fit_ens){
     std::array<double, n_observation> nst{};
     int action; int action_target;
 
@@ -73,12 +73,21 @@ void evaluate(CartPoleSwingUp env, const individual* indi, vector<agent_pair> &a
             _sim += 1;
 
         auto [nst, reward, end] = env.step(action_set[action]);
-        if (end) break;
         _fit += reward;
+        if (end) break;
     }
     _sim /= double(cnt);
 
-    fit = _fit; sim = _sim;
+    env.reset();
+    double _fit_ens = 0;
+    for (int step = 0; step < 1000; step++){
+        action = rl::ensemble_selection(env, agent);
+        auto [nst, reward, end] = env.step(action_set[action]);
+        _fit_ens += reward;
+        if (end) break;
+    }
+
+    fit = _fit; sim = _sim; fit_ens = _fit_ens;
 }
 
 void agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
@@ -145,28 +154,28 @@ int sample(vector<double> &rank){
     return ans;
 }
 
-void model_save(individual* &indi_utnb, pri_que &agent){
+void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent){
     // save best model
-    individual::save_indi(indi_utnb->root, "Agent/best_agent.txt");
+    individual::save_indi(indi_utnb->root, "Agent/" + _pre + "best_agent.txt");
 
     // agent flat
     vector<agent_pair> agent_array;
     agent_flat(agent, agent_array);
 
-    ofstream _file("Agent/ensemble_size.txt");
+    ofstream _file("Agent/" + _pre + "ensemble_size.txt");
     _file << agent_array.size() << endl;
     _file.close();
 
     for (int i = 0; i < agent_array.size(); i++) {
-        string _f_name = "Agent/agent.txt";
+        string _f_name = "Agent/" + _pre + "agent.txt";
         string num = std::to_string(i);
-        _f_name.insert(11, num);
+        _f_name.insert(_f_name.length() - 4, num);
         individual::save_indi(agent_array[i].first->root, _f_name);
     }
 }
 
 // Todo: restart strategy
-void rl::rl_op() {
+void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
     auto env = CartPoleSwingUp();
 
     // build a model
@@ -199,11 +208,13 @@ void rl::rl_op() {
     vector<double> rank;
 
     // record the evolution process
-    std::array<double, MAX_GENERATION> f_b {};
     std::array<double, MAX_GENERATION> f_a {};
+    std::array<double, MAX_GENERATION> f_b {};
+    std::array<double, MAX_GENERATION> f_ens {};
+    std::array<double, MAX_GENERATION> f_utnb {};
+
     std::array<double, MAX_GENERATION> sim_a {};
     std::array<double, MAX_GENERATION> siz_a {};
-    std::array<double, MAX_GENERATION/20> f_ens {};
 
     indi_utnb = nullptr;
     fit_utnbi = 0;
@@ -216,7 +227,7 @@ void rl::rl_op() {
     tf::Executor executor;
     tf::Taskflow taskflow;
     auto observer = executor.make_observer<tf::ExecutorObserver>();
-    std::ofstream ofs("timestamps.json");
+
 
     env.reset_ini();
     agent_push(agent, pop[0], -1e6);
@@ -230,6 +241,7 @@ void rl::rl_op() {
 
         std::array<double, POP_SIZE> fit{};
         std::array<double, POP_SIZE> sim{};
+        std::array<double, POP_SIZE> fit_ens{};
 
         vector<agent_pair> agent_array;
         agent_flat(agent, agent_array);
@@ -241,14 +253,20 @@ void rl::rl_op() {
         // parallel
         taskflow.clear();
         for (int i = 0; i < POP_SIZE; i++) {
-            auto item = taskflow.emplace([&fit, &sim, env, pop, &agent_array, i]() {
-                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+            auto item = taskflow.emplace([&fit, &sim, &fit_ens, env, pop, &agent_array, i]() {
+                evaluate(env, pop[i], agent_array, fit[i], sim[i], fit_ens[i]);
             });
             item.name(std::to_string(i));
         }
         executor.run(taskflow);
         executor.wait_for_all();
-        observer->dump(ofs);
+
+        // Multi-processor Scheduling
+//        if (gen == 0) {
+//            std::ofstream ofs(_pre + "timestamps.json");
+//            observer->dump(ofs);
+//            ofs.close();
+//        }
 
         for (int i = 0; i < POP_SIZE; i++) {
             sim_total += sim[i];
@@ -259,8 +277,11 @@ void rl::rl_op() {
         }
 
         f_a[gen] = fit_total / double(POP_SIZE);
+        f_b[gen] = fit[indi_best];
+        f_ens[gen] = fit_ens[indi_best];
         sim_a[gen] = sim_total / double(POP_SIZE);
         siz_a[gen] = size_total / double(POP_SIZE);
+
 
         if (indi_utnb == nullptr) {
             indi_utnb = new individual(*pop[indi_best]);
@@ -272,7 +293,7 @@ void rl::rl_op() {
                 fit_utnbi = fit[indi_best];
             }
         }
-        f_b[gen] = fit_utnbi;
+        f_utnb[gen] = fit_utnbi;
 
         // rank mode
         double fit_rate, sim_rate;
@@ -323,38 +344,42 @@ void rl::rl_op() {
         delete [] new_pop;
 
         // record
-        spdlog::info("Gen: {:<4d} f_b: {:<8.3f} f_a: {:<8.3f} s_a: {:<6.1f} "
-                     "r_f: {:<3.1f} r_s: {:<3.1f} "
-                     "f_utnb: {:<8.3f} f_ens_min: {:<8.3f}", gen, fit[indi_best], f_a[gen], siz_a[gen],
-                     fit_rate, sim_rate, f_b[gen], agent.top().second);
+        spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} "
+                     "s_a: {:<6.1f} sim_a: {:<6.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f}",
+                     gen, f_a[gen], f_b[gen], f_ens[gen],
+                     siz_a[gen], sim_a[gen], fit_rate, sim_rate, f_utnb[gen]);
 
-        if ((gen+1) % 50 == 0) model_save(indi_utnb, agent);
+        result[gen].f_a += f_a[gen];
+        result[gen].f_b += f_b[gen];
+        result[gen].f_ens = f_ens[gen];
+
+        if ((gen+1) % 5 == 0) model_save(_pre, indi_utnb, agent);
     }
 
     // print the average fit and dist
-    ofstream _file("Result.txt");
+    ofstream _file("Result/" + _pre + "Result.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
-        _file << i << " " << f_b[i] << " " << f_ens[i/20] << " " << f_a[i] << " " << siz_a[i] << endl;
+        _file << i << " " << f_a[i] << " " << f_b[i] << " " << f_ens[i] << " " << siz_a[i] << sim_a[i] << endl;
     _file.close();
 
-    // print
-    py::object _b_i = py::cast(f_b);
-    py::object _f_ens = py::cast(f_ens);
-    py::object _f_a = py::cast(f_a);
-    py::object _siz_a = py::cast(siz_a);
-
-    py::object plt = py::module::import("matplotlib.pyplot");
-    plt.attr("figure")();
-    plt.attr("subplot")(411);
-    plt.attr("plot")(_b_i);
-    plt.attr("subplot")(412);
-    plt.attr("plot")(_f_ens);
-    plt.attr("subplot")(413);
-    plt.attr("plot")(_f_a);
-    plt.attr("subplot")(414);
-    plt.attr("plot")(_siz_a);
-    plt.attr("yscale")("log");
-    plt.attr("show")();
+//    // print
+//    py::object _b_i = py::cast(f_b);
+//    py::object _f_ens = py::cast(f_ens);
+//    py::object _f_a = py::cast(f_a);
+//    py::object _siz_a = py::cast(siz_a);
+//
+//    py::object plt = py::module::import("matplotlib.pyplot");
+//    plt.attr("figure")();
+//    plt.attr("subplot")(411);
+//    plt.attr("plot")(_b_i);
+//    plt.attr("subplot")(412);
+//    plt.attr("plot")(_f_ens);
+//    plt.attr("subplot")(413);
+//    plt.attr("plot")(_f_a);
+//    plt.attr("subplot")(414);
+//    plt.attr("plot")(_siz_a);
+//    plt.attr("yscale")("log");
+//    plt.attr("show")();
 
     for (int i = 0; i < POP_SIZE; i++)
         individual::indi_clean(pop[i]);

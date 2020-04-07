@@ -7,6 +7,7 @@
 
 #include <string>
 
+const int EXP_NUM = 10;
 const int MIN_DEPTH = 3;
 const int INI_DEPTH = 5;
 const int MUT_DEPTH = 3;

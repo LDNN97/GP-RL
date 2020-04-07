@@ -31,10 +31,16 @@ namespace rl{
     };
     typedef std::priority_queue<agent_pair, std::vector<agent_pair>, cmp> pri_que;
 
+    struct result_item{
+        double f_b;
+        double f_ens;
+        double f_a;
+    };
+
     // Train
     int get_max_action(CartPoleSwingUp &env, const individual* indi);
     int ensemble_selection(CartPoleSwingUp &env, std::vector<agent_pair> &agent);
-    void rl_op();
+    void rl_op(const std::string & _pre, double &succ_rate, std::array<rl::result_item, MAX_GENERATION> &result);
 
     // Display();
     void env_reset(pybind11::object &env, state_arr &st);
