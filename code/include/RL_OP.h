@@ -40,7 +40,7 @@ namespace rl{
     // Train
     int get_max_action(CartPoleSwingUp &env, const individual* indi);
     int ensemble_selection(CartPoleSwingUp &env, const std::vector<agent_pair> &agent);
-    void rl_op(const std::string & _pre, double &succ_rate, std::array<rl::result_item, MAX_GENERATION> &result);
+    void rl_op(const int seed, const std::string & _pre, double &succ_rate, std::array<rl::result_item, MAX_GENERATION> &result);
 
     // Display();
     void env_reset(pybind11::object &env, state_arr &st);

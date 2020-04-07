@@ -11,7 +11,7 @@ int main() {
         std::string num = std::to_string(i);
         _pre.insert(4, num);
         _pre += " ";
-        rl::rl_op(_pre, succ_rate, result);
+        rl::rl_op(i, _pre, succ_rate, result);
     }
     std::ofstream _file("Result/Result.txt");
     for (int i = 0; i < MAX_GENERATION; i++)

@@ -183,8 +183,8 @@ void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent
     }
 }
 
-void rl::rl_op(const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
-    auto env = CartPoleSwingUp();
+void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
+    auto env = CartPoleSwingUp(seed);
 
     // build a model
     auto pop = new individual* [POP_SIZE];

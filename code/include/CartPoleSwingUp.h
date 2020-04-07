@@ -14,7 +14,7 @@ public:
     arma::vec state, state_ini, state_last;
     double t, t_last;
 
-    CartPoleSwingUp();
+    CartPoleSwingUp(const int seed = 0);
     void reset_ini();
     void reset();
     void back_step();
