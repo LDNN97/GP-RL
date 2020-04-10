@@ -57,7 +57,7 @@ int rl::ensemble_selection(CartPoleSwingUp &env, const vector<agent_pair> &agent
     return ans;
 }
 
-void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pair> &agent, double &fit, double &sim){
+void evaluate(CartPoleSwingUp env, const individual* indi, const individual* indi_utnb, double &fit, double &sim){
     std::array<double, n_observation> nst{};
     int action; int action_target;
 
@@ -68,7 +68,7 @@ void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pa
         cnt++;
         action = get_max_action(env, indi);
 
-        action_target = rl::ensemble_selection(env, agent);
+        action_target = get_max_action(env, indi_utnb);
         if (action == action_target)
             _sim += 1;
 
@@ -79,6 +79,22 @@ void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pa
     _sim /= double(cnt);
 
     fit = _fit; sim = _sim;
+}
+
+double evaluate_utnb(CartPoleSwingUp &env, const individual* indi_utnb) {
+    std::array<double, n_observation> nst{};
+    int action;
+
+    env.reset();
+    double _fit_utnb = 0;
+    for (int step = 0; step < 1000; step++){
+        action = get_max_action(env, indi_utnb);
+        auto [nst, reward, end] = env.step(action_set[action]);
+        _fit_utnb += reward;
+        if (end) break;
+    }
+
+    return _fit_utnb;
 }
 
 void evaluate_ens(CartPoleSwingUp &env, const vector<agent_pair> &agent, double &fit_ens){
@@ -96,39 +112,7 @@ void evaluate_ens(CartPoleSwingUp &env, const vector<agent_pair> &agent, double 
     fit_ens = _fit_ens;
 }
 
-
-
-void agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
-    agent_array.clear();
-    while (!agent.empty()){
-        agent_array.emplace_back(agent.top());
-        agent.pop();
-    }
-    for (auto indi : agent_array) agent.push(indi);
-}
-
-void agent_push(pri_que &agent, individual* indi, double fit){
-    if (agent.empty()) {
-        auto tmp = new individual(*indi);
-        agent.push(agent_pair(tmp, fit));
-    }
-    else {
-        agent_pair top = agent.top();
-        if (top.second <= fit) {
-            auto tmp = new individual(*indi);
-            agent.push(agent_pair(tmp, fit));
-        }
-        if (agent.size() > ENSEMBLE_SIZE) {
-            auto tmp = agent.top();
-            individual::indi_clean(tmp.first);
-            agent.pop();
-        }
-    }
-}
-
-// Rank
 template <typename T>
-
 vector<size_t> sort_indexes(const std::array<T, POP_SIZE> &v) {
     vector<size_t> idx(v.size());
     iota(idx.begin(), idx.end(), 0);
@@ -161,6 +145,34 @@ int sample(vector<double> &rank){
         ans = (rank[ans] > rank[tmp]) ? ans : tmp;
     }
     return ans;
+}
+
+void agent_flat(pri_que &agent, vector<agent_pair> &agent_array){
+    agent_array.clear();
+    while (!agent.empty()){
+        agent_array.emplace_back(agent.top());
+        agent.pop();
+    }
+    for (auto indi : agent_array) agent.push(indi);
+}
+
+void agent_push(pri_que &agent, individual* indi, double fit){
+    if (agent.empty()) {
+        auto tmp = new individual(*indi);
+        agent.push(agent_pair(tmp, fit));
+    }
+    else {
+        agent_pair top = agent.top();
+        if (top.second <= fit) {
+            auto tmp = new individual(*indi);
+            agent.push(agent_pair(tmp, fit));
+        }
+        if (agent.size() > ENSEMBLE_SIZE) {
+            auto tmp = agent.top();
+            individual::indi_clean(tmp.first);
+            agent.pop();
+        }
+    }
 }
 
 void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent){
@@ -227,8 +239,6 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
 
         std::array<double, POP_SIZE> fit{};
         std::array<double, POP_SIZE> sim{};
-        vector<agent_pair> agent_array;
-        agent_flat(agent, agent_array);
 
         // single
 //        for (int i = 0; i < POP_SIZE; i++) {
@@ -239,8 +249,8 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         // parallel
         taskflow.clear();
         for (int i = 0; i < POP_SIZE; i++) {
-            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
-                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+            auto item = taskflow.emplace([i, env, pop, indi_utnb, &fit, &sim]() {
+                evaluate(env, pop[i], indi_utnb, fit[i], sim[i]);
             });
             item.name(std::to_string(i));
         }
@@ -254,7 +264,7 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
 //            ofs.close();
 //        }
 
-        evaluate_ens(env, agent_array, f_ens[gen]);
+        double fit_utnb_now = evaluate_utnb(env, indi_utnb);
 
         int indi_best = 0;
         for (int i = 0; i < POP_SIZE; i++) {
@@ -264,6 +274,10 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
             indi_best = (fit[indi_best] > fit[i]) ? indi_best : i;
             agent_push(agent, pop[i], fit[i]);
         }
+
+        vector<agent_pair> agent_array;
+        agent_flat(agent, agent_array);
+        evaluate_ens(env, agent_array, f_ens[gen]);
 
         if (fit[indi_best] >= fit_utnbi) {
             individual::indi_clean(indi_utnb);
@@ -328,10 +342,10 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         delete [] new_pop;
 
         // record
-        spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} "
-                     "s_a: {:<6.1f} sim_a: {:<3.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
-                     gen, f_a[gen], f_b[gen], f_ens[gen],
-                     siz_a[gen], sim_a[gen], fit_rate, sim_rate, f_utnb[gen], agent_array[0].second);
+        spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_utnb_now: {:<8.3f} f_ens: {:<8.3f} "
+                     "s_a: {:<6.1f} sim_a: {:<3.1f} r_f: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
+                     gen, f_a[gen], f_b[gen], fit_utnb_now, f_ens[gen],
+                     siz_a[gen], sim_a[gen], fit_rate, f_utnb[gen], agent_array[0].second);
 
         result[gen].f_a += f_a[gen];
         result[gen].f_b += f_b[gen];
