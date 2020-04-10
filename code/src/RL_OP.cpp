@@ -272,8 +272,8 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
             sim_a[gen] += sim[i] / double(POP_SIZE);
             siz_a[gen] += (double) pop[i]->root->size / double(POP_SIZE);
             indi_best = (fit[indi_best] > fit[i]) ? indi_best : i;
-            agent_push(agent, pop[i], fit[i]);
         }
+        agent_push(agent, pop[indi_best], fit[indi_best]);
 
         vector<agent_pair> agent_array;
         agent_flat(agent, agent_array);

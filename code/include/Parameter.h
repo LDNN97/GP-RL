@@ -17,7 +17,7 @@ const double C_P = 0.8; // Crossover Probability
 const double M_P = 0.2; // Mutation Probability
 const int TYPE_NUM = 5;
 const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;
-const int ENSEMBLE_SIZE = 10;
+const int ENSEMBLE_SIZE = 30;
 
 // !!!!!Remember to change the tree_node code about the terminal node!!!!!!
 
