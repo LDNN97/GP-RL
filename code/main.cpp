@@ -19,11 +19,13 @@ int main() {
             << result[i].f_b / double(EXP_NUM) << " " << result[i].f_ens / double(EXP_NUM) << std::endl;
     _file.close();
 
-    // Display
-//    std::string _pre = "EXP ";
-//    std::string num = std::to_string(0); // set 0 to EXP_NUM
-//    _pre.insert(4, num);
-//    _pre += " ";
-//    rl::display(_pre);
+    // Display: choose !only! one of the following agents
+//    rl::best_agent(0);
+//    rl::ensemble_agent(0);
+//
+//    std::vector<int> exp_set; // push the EXP_ID in exp_set
+//    exp_set.emplace_back(0);
+//    exp_set.emplace_back(1);
+//    rl::population_agent(exp_set);
 }
 

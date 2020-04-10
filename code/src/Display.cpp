@@ -63,16 +63,24 @@ int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
     return ans;
 }
 
-void rl::best_agent(const std::string & _pre) {
+void rl::best_agent(int ID) {
+    pybind11::scoped_interpreter guard{};
+    pybind11::module::import("sys").attr("argv").attr("append")("");
+
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
+
+    std::string _pre = "EXP ";
+    std::string num = std::to_string(ID); // set 0 to EXP_NUM
+    _pre.insert(4, num);
+    _pre += " ";
 
     individual* indi = individual::load_indi("Agent/" + _pre + "best_agent.txt");
 
     std::array<double, n_observation> st{}, nst{};
     int action; double reward; bool end;
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
         env.attr("reset_ini")();
         rl::env_reset(env, st);
         double reward_indi = 0;
@@ -91,9 +99,17 @@ void rl::best_agent(const std::string & _pre) {
     individual::indi_clean(indi);
 }
 
-void rl::ensemble_agent(const std::string & _pre) {
+void rl::ensemble_agent(int ID) {
+    pybind11::scoped_interpreter guard{};
+    pybind11::module::import("sys").attr("argv").attr("append")("");
+
     py::object env_list = py::module::import("env");
     py::object env = env_list.attr(env_name.c_str())();
+
+    std::string _pre = "EXP ";
+    std::string num = std::to_string(ID);
+    _pre.insert(4, num);
+    _pre += " ";
 
     int ensemble_size = 0;
     ifstream _file("Agent/" + _pre + "ensemble_size.txt");
@@ -103,8 +119,8 @@ void rl::ensemble_agent(const std::string & _pre) {
     vector<individual*> agent;
     for (int i = 0; i < ensemble_size; i++) {
         string _f_name = "Agent/" + _pre + "agent.txt";
-        string num = std::to_string(i);
-        _f_name.insert(_f_name.length() - 4, num);
+        string _f_num = std::to_string(i);
+        _f_name.insert(_f_name.length() - 4, _f_num);
         individual* indi = individual::load_indi(_f_name);
         agent.emplace_back(indi);
     }
@@ -112,7 +128,7 @@ void rl::ensemble_agent(const std::string & _pre) {
     std::array<double, n_observation> st{}, nst{};
     int action; double reward; bool end;
 
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
         env.attr("reset_ini")();
         rl::env_reset(env, st);
         double reward_indi = 0;
@@ -133,12 +149,58 @@ void rl::ensemble_agent(const std::string & _pre) {
     agent.clear();
 }
 
-void rl::display(const std::string & _pre){
+void rl::population_agent(std::vector<int> exp_set) {
     pybind11::scoped_interpreter guard{};
     pybind11::module::import("sys").attr("argv").attr("append")("");
-    spdlog::info("Display Best Agent:");
-    rl::best_agent(_pre);
-    spdlog::info("Display Ensemble Agent:");
-    rl::ensemble_agent(_pre);
+
+    py::object env_list = py::module::import("env");
+    py::object env = env_list.attr(env_name.c_str())();
+
+    vector<individual*> agent;
+    for (auto i : exp_set) {
+        std::string _pre = "EXP ";
+        std::string num = std::to_string(i); // set 0 to EXP_NUM
+        _pre.insert(4, num);
+        _pre += " ";
+
+        for (int j = 0; j < ENSEMBLE_SIZE; j++) {
+            string _f_name = "Agent/" + _pre + "agent.txt";
+            std::string _f_num = std::to_string(j);
+            _f_name.insert(_f_name.length() - 4, _f_num);
+            individual* indi = individual::load_indi(_f_name);
+            agent.emplace_back(indi);
+        }
+    }
+
+    std::array<double, n_observation> st{}, nst{};
+    int action; double reward; bool end;
+
+    for (int i = 0; i < 10; i++) {
+        env.attr("reset_ini")();
+        std::array<int, 1000> rec_a{};
+        rl::env_reset(env, st);
+        double reward_indi = 0;
+        for (int step = 0; step < 1000; step++){
+            rec_a[step] = ensemble_selection(env, agent);
+            rl::env_step(env, rec_a[step], nst, reward, end);
+            std::swap(st, nst);
+            if (end) break;
+            reward_indi += reward;
+        }
+        spdlog::info("Reward:{:>8.3f}", reward_indi);
+
+        rl::env_reset(env, st);
+        for (int step = 0; step < 1000; step++){
+            rl::env_step(env, rec_a[step], nst, reward, end);
+            std::swap(st, nst);
+            if (end) break;
+            env.attr("render")();
+        }
+    }
+    env.attr("close")();
+
+    for (auto indi:agent)
+        individual::indi_clean(indi);
+    agent.clear();
 }
 

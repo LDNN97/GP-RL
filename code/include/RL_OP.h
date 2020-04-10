@@ -47,9 +47,9 @@ namespace rl{
     void env_step(pybind11::object &env, const int &act, state_arr &nst, double &reward, bool &end);
     int get_max_action(pybind11::object &env, individual* indi);
     int ensemble_selection(pybind11::object &env, std::vector<individual*> &agent);
-    void best_agent(const std::string & _pre);
-    void ensemble_agent(const std::string & _pre);
-    void display(const std::string & _pre);
+    void best_agent(int ID);
+    void ensemble_agent(int ID);
+    void population_agent(std::vector<int> exp_set);
 }
 
 #endif //GPRL_CPP_RL_OP_H

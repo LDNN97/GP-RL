@@ -7,13 +7,13 @@
 
 #include <string>
 
-const int EXP_NUM = 10;
+const int EXP_NUM = 1;
 const int MIN_DEPTH = 3;
 const int INI_DEPTH = 5;
 const int MUT_DEPTH = 3;
-const int MAX_GENERATION = 300;
+const int MAX_GENERATION = 500;
 const int T_S = 6; // Tournament Size
-const double C_P = 0.5; // Crossover Probability
+const double C_P = 0.8; // Crossover Probability
 const double M_P = 0.2; // Mutation Probability
 const int TYPE_NUM = 5;
 const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;

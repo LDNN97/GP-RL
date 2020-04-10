@@ -6,8 +6,8 @@
 
 using namespace std;
 
-mt19937 mt(0); // seed()
-//mt19937 mt(time(0));
+//mt19937 mt(0); // seed()
+mt19937 mt(time(0));
 uniform_real_distribution<double> dis(0, 1);
 
 int rand_int(int lower, int upper) {

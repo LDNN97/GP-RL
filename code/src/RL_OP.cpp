@@ -264,6 +264,7 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
             indi_best = (fit[indi_best] > fit[i]) ? indi_best : i;
             agent_push(agent, pop[i], fit[i]);
         }
+
         if (fit[indi_best] >= fit_utnbi) {
             individual::indi_clean(indi_utnb);
             indi_utnb = new individual(*pop[indi_best]);
@@ -276,19 +277,22 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         double fit_rate, sim_rate;
 
         // original method
-        fit_rate = 1; sim_rate = 0;
+//        fit_rate = 1; sim_rate = 0;
 
         // improved method
-//        if (f_a[gen] >= fit_lgar) {
-//            fit_rate = 1; sim_rate =0;
-//        } else {
-//            if (fit[indi_best] > agent.top().second) {
-//                fit_rate = 0.7; sim_rate = 0.3;
-//            } else {
-//                fit_rate = 0.5; sim_rate = 0.5;
-//            }
-//        }
-//        fit_lgar = f_a[gen];
+        if (f_a[gen] >= fit_lgar) {
+            fit_rate = 1;
+            sim_rate = 0;
+        } else {
+            if (fit[indi_best] >= agent.top().second) {
+                fit_rate = 0.7;
+                sim_rate = 0.3;
+            } else {
+                fit_rate = 0.5;
+                sim_rate = 0.5;
+            }
+        }
+        fit_lgar = f_a[gen];
 
         // get rank
         // rank
@@ -325,7 +329,7 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
 
         // record
         spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} "
-                     "s_a: {:<6.1f} sim_a: {:<6.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f}, top: {:<8.3f}",
+                     "s_a: {:<6.1f} sim_a: {:<3.1f} r_f: {:<3.1f} r_s: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
                      gen, f_a[gen], f_b[gen], f_ens[gen],
                      siz_a[gen], sim_a[gen], fit_rate, sim_rate, f_utnb[gen], agent_array[0].second);
 
@@ -339,7 +343,7 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
     // print the average fit and dist
     ofstream _file("Result/" + _pre + "Result.txt");
     for (int i = 0; i < MAX_GENERATION; i++)
-        _file << i << " " << f_a[i] << " " << f_b[i] << " " << f_ens[i] << " " << siz_a[i] << sim_a[i] << endl;
+        _file << i << " " << f_a[i] << " " << f_b[i] << " " << f_ens[i] << " " << siz_a[i] << " " << sim_a[i] << endl;
     _file.close();
 
 //    // print
