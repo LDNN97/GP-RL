@@ -5,6 +5,7 @@
 #include "../include/Individual.h"
 
 using namespace indi;
+using std::memset;
 
 individual::individual(node* pt){
     root = pt;

@@ -99,7 +99,7 @@ void rl::best_agent(int ID) {
     individual::indi_clean(indi);
 }
 
-void rl::ensemble_agent(int ID) {
+void rl::ensemble_agent(int ID, int ind) {
     pybind11::scoped_interpreter guard{};
     pybind11::module::import("sys").attr("argv").attr("append")("");
 
@@ -117,30 +117,46 @@ void rl::ensemble_agent(int ID) {
     _file.close();
 
     vector<individual*> agent;
-    for (int i = 0; i < ensemble_size; i++) {
+    if (ind == -1) {
+        for (int i = 0; i < ensemble_size; i++) {
+            string _f_name = "Agent/" + _pre + "agent.txt";
+            string _f_num = std::to_string(i);
+            _f_name.insert(_f_name.length() - 4, _f_num);
+            individual* indi = individual::load_indi(_f_name);
+            agent.emplace_back(indi);
+        }
+    }else {
         string _f_name = "Agent/" + _pre + "agent.txt";
-        string _f_num = std::to_string(i);
+        string _f_num = std::to_string(ind);
         _f_name.insert(_f_name.length() - 4, _f_num);
         individual* indi = individual::load_indi(_f_name);
         agent.emplace_back(indi);
     }
 
     std::array<double, n_observation> st{}, nst{};
-    int action; double reward; bool end;
+    double reward; bool end;
 
     for (int i = 0; i < 10; i++) {
         env.attr("reset_ini")();
+        std::array<int, 1000> rec_a{};
         rl::env_reset(env, st);
         double reward_indi = 0;
         for (int step = 0; step < 1000; step++){
-            action = ensemble_selection(env, agent);
-            rl::env_step(env, action, nst, reward, end);
+            rec_a[step] = ensemble_selection(env, agent);
+            rl::env_step(env, rec_a[step], nst, reward, end);
             std::swap(st, nst);
             if (end) break;
-            reward_indi += reward; //env CartPole +1 MountainCar -1
-            env.attr("render")();
+            reward_indi += reward;
         }
         spdlog::info("Reward:{:>8.3f}", reward_indi);
+
+        rl::env_reset(env, st);
+        for (int step = 0; step < 1000; step++){
+            rl::env_step(env, rec_a[step], nst, reward, end);
+            std::swap(st, nst);
+            if (end) break;
+            env.attr("render")();
+        }
     }
     env.attr("close")();
 

@@ -10,6 +10,7 @@
 #include <vector>
 #include <queue>
 #include <array>
+#include <cstring>
 #include "Parameter.h"
 #include "Random.h"
 #include "Tree_node.h"
