@@ -4,8 +4,9 @@
 
 
 #include "../include/RL_OP.h"
-#include <spdlog/spdlog.h>
 #include <taskflow/taskflow.hpp>
+#include <spdlog/spdlog.h>
+#include "spdlog/sinks/basic_file_sink.h"
 
 namespace py = pybind11;
 using namespace rl;
@@ -177,18 +178,18 @@ void agent_push(pri_que &agent, individual* indi, double fit){
 
 void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent){
     // save best model
-    individual::save_indi(indi_utnb->root, "Agent/" + _pre + "best_agent.txt");
+    individual::save_indi(indi_utnb->root, "Result/" + _pre + "best_agent.txt");
 
     // agent flat
     vector<agent_pair> agent_array;
     agent_flat(agent, agent_array);
 
-    ofstream _file("Agent/" + _pre + "ensemble_size.txt");
+    ofstream _file("Result/" + _pre + "ensemble_size.txt");
     _file << agent_array.size() << endl;
     _file.close();
 
     for (int i = 0; i < agent_array.size(); i++) {
-        string _f_name = "Agent/" + _pre + "agent.txt";
+        string _f_name = "Result/" + _pre + "agent.txt";
         string num = std::to_string(i);
         _f_name.insert(_f_name.length() - 4, num);
         individual::save_indi(agent_array[i].first->root, _f_name);
@@ -196,6 +197,10 @@ void model_save(const std::string & _pre, individual* &indi_utnb, pri_que &agent
 }
 
 void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
+    string logger_file = "Result/" + _pre + "log.txt";
+    auto logger = spdlog::basic_logger_mt("mylogger", logger_file);
+    logger->set_pattern("%v");
+
     auto env = CartPoleSwingUp(seed);
 
     // build a model
@@ -291,22 +296,22 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         double fit_rate, sim_rate;
 
         // original method
-        fit_rate = 1; sim_rate = 0;
+//        fit_rate = 1; sim_rate = 0;
 
         // improved method
-//        if (f_a[gen] >= fit_lgar) {
-//            fit_rate = 1;
-//            sim_rate = 0;
-//        } else {
-//            if (fit[indi_best] >= agent.top().second) {
-//                fit_rate = 0.7;
-//                sim_rate = 0.3;
-//            } else {
-//                fit_rate = 0.5;
-//                sim_rate = 0.5;
-//            }
-//        }
-//        fit_lgar = f_a[gen];
+        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.8) {
+            fit_rate = 1;
+            sim_rate = 0;
+        } else {
+            if (fit[indi_best] >= agent.top().second) {
+                fit_rate = 0.7;
+                sim_rate = 0.3;
+            } else {
+                fit_rate = 0.5;
+                sim_rate = 0.5;
+            }
+        }
+        fit_lgar = f_a[gen];
 
         // get rank
         // rank
@@ -342,8 +347,13 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         delete [] new_pop;
 
         // record
+        spdlog::set_pattern("%v");
         spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_utnb_now: {:<8.3f} f_ens: {:<8.3f} "
-                     "s_a: {:<6.1f} sim_a: {:<3.1f} r_f: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
+                     "s_a: {:<6.1f} sim_a: {:<4.2f} r_f: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
+                     gen, f_a[gen], f_b[gen], fit_utnb_now, f_ens[gen],
+                     siz_a[gen], sim_a[gen], fit_rate, f_utnb[gen], agent_array[0].second);
+        logger->info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_utnb_now: {:<8.3f} f_ens: {:<8.3f} "
+                     "s_a: {:<6.1f} sim_a: {:<4.2f} r_f: {:<3.1f} f_utnb: {:<8.3f} top: {:<8.3f}",
                      gen, f_a[gen], f_b[gen], fit_utnb_now, f_ens[gen],
                      siz_a[gen], sim_a[gen], fit_rate, f_utnb[gen], agent_array[0].second);
 

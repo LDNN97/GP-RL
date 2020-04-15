@@ -11,13 +11,13 @@ const int EXP_NUM = 1;
 const int MIN_DEPTH = 3;
 const int INI_DEPTH = 5;
 const int MUT_DEPTH = 3;
-const int MAX_GENERATION = 300;
+const int MAX_GENERATION = 10000;
 const int T_S = 6; // Tournament Size
 const double C_P = 0.8; // Crossover Probability
 const double M_P = 0.2; // Mutation Probability
 const int TYPE_NUM = 5;
 const int POP_SIZE = (INI_DEPTH - MIN_DEPTH + 1) * TYPE_NUM * 2;
-const int ENSEMBLE_SIZE = 30;
+const int ENSEMBLE_SIZE = POP_SIZE / 2;
 
 // !!!!!Remember to change the tree_node code about the terminal node!!!!!!
 
