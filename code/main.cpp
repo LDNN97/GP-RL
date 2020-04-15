@@ -1,9 +1,8 @@
 #include "include/RL_OP.h"
 #include "include/CartPoleSwingUp.h"
 
-// todo: 1. According to the similarity, random choose an indi from ensemble agents to replace fit_utnb.
+// todo: 1. model free
 // todo: 2. restart.
-// todo: 3. model free
 
 int main() {
     // Training
