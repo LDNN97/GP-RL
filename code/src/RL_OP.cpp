@@ -318,25 +318,26 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
 //        fit_rate = 1; sim_rate = 0;
 
         // improved method
-//        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.5) {
-//            fit_rate = 1;
-//            sim_rate = 0;
-//        } else {
-//            if (fit[indi_best] >= agent.top().second) {
-//                fit_rate = 0.7;
-//                sim_rate = 0.3;
-//            } else {
-//                fit_rate = 0.5;
-//                sim_rate = 0.5;
-//            }
-//        }
-//        fit_lgar = f_a[gen];
+        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.5) {
+            fit_rate = 1;
+            sim_rate = 0;
+        } else {
+            if (fit[indi_best] >= agent.top().second) {
+                fit_rate = 0.7;
+                sim_rate = 0.3;
+            } else {
+                fit_rate = 0.5;
+                sim_rate = 0.5;
+            }
+        }
+        fit_lgar = f_a[gen];
 
         // get rank
         // rank
         vector<double> rank;
-//        get_rank1(rank, fit, sim, fit_rate, sim_rate);
-        get_rank2(rank, fit, sim);
+        get_rank1(rank, fit, sim, fit_rate, sim_rate);
+//        get_rank2(rank, fit, sim);
+
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
 //            cout << "=====successfully!======" << endl;
 //            cout << endl;
