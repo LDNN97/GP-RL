@@ -63,15 +63,19 @@ void evaluate(CartPoleSwingUp env, const individual* indi, const individual* ind
     int action; int action_target;
 
     env.reset();
-    int cnt = 0;
+    int cnt = 0; bool always_same = true;
     double _fit = 0, _sim = 0;
     for (int step = 0; step < 1000; step++){
         cnt++;
         action = get_max_action(env, indi);
 
-        action_target = get_max_action(env, indi_utnb);
-        if (action == action_target)
-            _sim += 1;
+        if (always_same) {
+            action_target = get_max_action(env, indi_utnb);
+            if (action == action_target)
+                _sim += 1;
+            else
+                always_same = false;
+        }
 
         auto [nst, reward, end] = env.step(action_set[action]);
         _fit += reward;
@@ -80,6 +84,7 @@ void evaluate(CartPoleSwingUp env, const individual* indi, const individual* ind
     _sim /= double(cnt);
 
     fit = _fit; sim = _sim;
+//    spdlog::info("{:<4.2f} {:<8.3f}", sim, fit);
 }
 
 double evaluate_utnb(CartPoleSwingUp &env, const individual* indi_utnb) {
@@ -121,7 +126,7 @@ vector<size_t> sort_indexes(const std::array<T, POP_SIZE> &v) {
     return idx;
 }
 
-void get_rank(std::vector<double> &rank, std::array<double, POP_SIZE> &fit, std::array<double, POP_SIZE> &sim,
+void get_rank1(std::vector<double> &rank, std::array<double, POP_SIZE> &fit, std::array<double, POP_SIZE> &sim,
                   double fit_rate, double sim_rate) {
     auto fit_index = sort_indexes(fit);
     auto dis_index = sort_indexes(sim);
@@ -136,6 +141,20 @@ void get_rank(std::vector<double> &rank, std::array<double, POP_SIZE> &fit, std:
         _rank = fit_rate * fit_rk[i] + sim_rate * sim_rk[i];
         rank.push_back(_rank);
     }
+}
+
+void get_rank2(std::vector<double> &rank, std::array<double, POP_SIZE> fit, std::array<double, POP_SIZE> sim){
+    double fit_min = *std::min_element(fit.begin(), fit.end());
+    double fit_max = *std::max_element(fit.begin(), fit.end());
+    for (double & i : fit)
+        i = (i - fit_min) / (fit_max - fit_min);
+    double sim_min = *std::min_element(sim.begin(), sim.end());
+    double sim_max = *std::max_element(sim.begin(), sim.end());
+    for (double & i : sim)
+        i = (i - sim_min) / (sim_max - sim_min);
+
+    for (int i = 0; i < POP_SIZE; i++)
+        rank.push_back(fit[i] + sim[i]);
 }
 
 // Tournament Selection
@@ -299,25 +318,25 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
 //        fit_rate = 1; sim_rate = 0;
 
         // improved method
-        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.8) {
-            fit_rate = 1;
-            sim_rate = 0;
-        } else {
-            if (fit[indi_best] >= agent.top().second) {
-                fit_rate = 0.7;
-                sim_rate = 0.3;
-            } else {
-                fit_rate = 0.5;
-                sim_rate = 0.5;
-            }
-        }
-        fit_lgar = f_a[gen];
+//        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.5) {
+//            fit_rate = 1;
+//            sim_rate = 0;
+//        } else {
+//            if (fit[indi_best] >= agent.top().second) {
+//                fit_rate = 0.7;
+//                sim_rate = 0.3;
+//            } else {
+//                fit_rate = 0.5;
+//                sim_rate = 0.5;
+//            }
+//        }
+//        fit_lgar = f_a[gen];
 
         // get rank
         // rank
         vector<double> rank;
-        get_rank(rank, fit, sim, fit_rate, sim_rate);
-
+//        get_rank1(rank, fit, sim, fit_rate, sim_rate);
+        get_rank2(rank, fit, sim);
 //        if ((fitness_total / double(POP_SIZE) < 1e-3) || (reward_total / double(POP_SIZE) > 450)) {
 //            cout << "=====successfully!======" << endl;
 //            cout << endl;
