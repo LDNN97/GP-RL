@@ -280,14 +280,14 @@ void individual::indi_clean(individual* indi){
     delete indi;
 }
 
-typedef std::pair<int, int> rela;
-typedef std::pair<int, rela> link;
-
 void individual::save_indi(node* now, const std::string& file_name){
     std::ofstream file(file_name);
     file << now->size << std::endl;
 
-    std::vector<link> tree;
+    typedef std::pair<int, int> _rela;
+    typedef std::pair<int, _rela> _link;
+    std::vector<_link> tree;
+
     node* que[now->size + 5];
     int f_ptr = 0, b_ptr = 1;
     que[0] = now;
@@ -297,7 +297,7 @@ void individual::save_indi(node* now, const std::string& file_name){
 
     while (f_ptr < b_ptr){
         if (que[f_ptr]->left != nullptr) {
-            tree.emplace_back(f_ptr, rela(0, b_ptr));
+            tree.emplace_back(f_ptr, _rela(0, b_ptr));
             que[b_ptr] = que[f_ptr]->left;
 
             file << b_ptr << " " <<
@@ -306,7 +306,7 @@ void individual::save_indi(node* now, const std::string& file_name){
             b_ptr += 1;
         }
         if (que[f_ptr]->right != nullptr) {
-            tree.emplace_back(f_ptr, rela(1, b_ptr));
+            tree.emplace_back(f_ptr, _rela(1, b_ptr));
             que[b_ptr] = que[f_ptr]->right;
 
             file << b_ptr << " " <<

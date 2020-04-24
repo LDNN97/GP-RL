@@ -187,7 +187,7 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
     auto logger = spdlog::basic_logger_mt("mylogger", logger_file);
     logger->set_pattern("%v");
 
-    auto env = CartPoleSwingUp(seed);
+    auto env = env_class(seed);
 
     // build a model
     auto pop = new individual* [POP_SIZE];

@@ -66,8 +66,9 @@ int rl::ensemble_selection(py::object &env, vector<individual*> &agent) {
 void rl::best_agent(int ID) {
     pybind11::scoped_interpreter guard{};
     pybind11::module::import("sys").attr("argv").attr("append")("");
+    pybind11::module::import("sys").attr("path").attr("insert")(0, "..");
 
-    py::object env_list = py::module::import("env");
+    py::object env_list = py::module::import("env_py");
     py::object env = env_list.attr(env_name.c_str())();
 
     std::string _pre = "EXP ";

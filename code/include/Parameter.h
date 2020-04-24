@@ -6,6 +6,7 @@
 #define GPRL_CPP_PARAMETER_H
 
 #include <string>
+#include "Env.h"
 
 const auto RAND_SEED = 0; // 0 or time(0)
 const int EXP_NUM = 1;
@@ -44,6 +45,7 @@ const std::string function_node[n_f]{"+", "-", "*", "/"};
 //const int action_set[n_action]{0, 1, 2};
 
 //-----CartPoleSwingUp-----
+typedef CartPoleSwingUp env_class;
 const std::string env_name = "CartPoleSwingUp";
 const int n_observation = 4;
 const int n_t = n_observation;
