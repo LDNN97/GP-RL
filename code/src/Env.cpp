@@ -49,6 +49,7 @@ std::tuple<std::array<double, 2>, double, bool> MountainCar::step(double action)
 
     double reward = -1;
 
+    state = {pos, vel};
     std::array<double, 2> obs {pos, vel};
     return std::tuple<std::array<double, 2>, double, bool>(obs, reward, done);
 }

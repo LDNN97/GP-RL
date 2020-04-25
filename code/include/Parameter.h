@@ -37,6 +37,7 @@ const int n_action = 3;
 const int action_set[n_action]{0, 1, 2};
 
 //-----CartPole-----
+//typedef CartPole env_class;
 //const std::string env_name = "CartPole";
 //const int n_observation = 4;
 //const int n_t = n_observation;

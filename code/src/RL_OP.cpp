@@ -232,21 +232,21 @@ void rl::rl_op(const std::string & _pre, const int seed, const std::string &meth
         agent_flat(agent, agent_array);
 
         // single
-        for (int i = 0; i < POP_SIZE; i++) {
-            env.reset();
-            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
-        }
+//        for (int i = 0; i < POP_SIZE; i++) {
+//            env.reset();
+//            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+//        }
 
         // parallel
-//        taskflow.clear();
-//        for (int i = 0; i < POP_SIZE; i++) {
-//            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
-//                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
-//            });
-//            item.name(std::to_string(i));
-//        }
-//        executor.run(taskflow);
-//        executor.wait_for_all();
+        taskflow.clear();
+        for (int i = 0; i < POP_SIZE; i++) {
+            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
+                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+            });
+            item.name(std::to_string(i));
+        }
+        executor.run(taskflow);
+        executor.wait_for_all();
 
         // Multi-processor Scheduling
 //        if (gen == 0) {
@@ -327,11 +327,11 @@ void rl::rl_op(const std::string & _pre, const int seed, const std::string &meth
         spdlog::set_pattern("%v");
         spdlog::info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} Ag_Min: {:<8.3f} "
                      "Ag_Max: {:<8.3f} s_a: {:<6.1f} sim_a: {:<4.2f} r_f: {:<3.1f}",
-                     gen, f_a[gen], f_b[gen], f_ens[gen], agent_array[0].second, agent_array[T_S - 1].second,
+                     gen, f_a[gen], f_b[gen], f_ens[gen], agent_array[0].second, agent_array[agent_array.size() - 1].second,
                      siz_a[gen], sim_a[gen], fit_rate);
         logger->info("Gen: {:<4d} f_a: {:<8.3f} f_b: {:<8.3f} f_ens: {:<8.3f} Ag_Min: {:<8.3f} "
                      "Ag_Max: {:<8.3f} s_a: {:<6.1f} sim_a: {:<4.2f} r_f: {:<3.1f}",
-                     gen, f_a[gen], f_b[gen], f_ens[gen], agent_array[0].second, agent_array[T_S - 1].second,
+                     gen, f_a[gen], f_b[gen], f_ens[gen], agent_array[0].second, agent_array[agent_array.size() - 1].second,
                      siz_a[gen], sim_a[gen], fit_rate);
 
         if ((gen+1) % 50 == 0) model_save(_pre, agent);
