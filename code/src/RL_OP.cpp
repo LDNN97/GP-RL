@@ -18,7 +18,7 @@ using std::ifstream;
 using std::string;
 using std::priority_queue;
 
-int rl::get_max_action(CartPoleSwingUp &env, const individual* indi){
+int rl::get_max_action(env_class &env, const individual* indi){
     state_arr nst{};
     double max_v = -1e6; int max_act = 0; double v;
 
@@ -35,7 +35,7 @@ int rl::get_max_action(CartPoleSwingUp &env, const individual* indi){
     return max_act;
 }
 
-int rl::ensemble_selection(CartPoleSwingUp &env, const vector<agent_pair> &agent_array) {
+int rl::ensemble_selection(env_class &env, const vector<agent_pair> &agent_array) {
     std::array<int, n_action> box{};
 
     for (auto indi : agent_array) {
@@ -58,14 +58,14 @@ int rl::ensemble_selection(CartPoleSwingUp &env, const vector<agent_pair> &agent
     return ans;
 }
 
-void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pair> &agent_array, double &fit, double &sim){
+void evaluate(env_class env, const individual* indi, const vector<agent_pair> &agent_array, double &fit, double &sim){
     std::array<double, n_observation> nst{};
     int action; int action_target;
 
     env.reset();
     int cnt = 0; bool always_same = true;
     double _fit = 0, _sim = 0;
-    for (int step = 0; step < 1000; step++){
+    for (int step = 0; step < 500; step++){
         cnt++;
         action = get_max_action(env, indi);
 
@@ -87,13 +87,13 @@ void evaluate(CartPoleSwingUp env, const individual* indi, const vector<agent_pa
 //    spdlog::info("{:<4.2f} {:<8.3f}", sim, fit);
 }
 
-void evaluate_ens(CartPoleSwingUp &env, const vector<agent_pair> &agent, double &fit_ens){
+void evaluate_ens(env_class &env, const vector<agent_pair> &agent, double &fit_ens){
     std::array<double, n_observation> nst{};
     int action;
 
     env.reset();
     double _fit_ens = 0;
-    for (int step = 0; step < 1000; step++){
+    for (int step = 0; step < 500; step++){
         action = rl::ensemble_selection(env, agent);
         auto [nst, reward, end] = env.step(action_set[action]);
         _fit_ens += reward;
@@ -182,7 +182,7 @@ void model_save(const std::string & _pre, pri_que &agent){
     }
 }
 
-void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std::array<result_item, MAX_GENERATION> &result) {
+void rl::rl_op(const std::string & _pre, const int seed, const std::string &method) {
     string logger_file = "Result/" + _pre + "log.txt";
     auto logger = spdlog::basic_logger_mt("mylogger", logger_file);
     logger->set_pattern("%v");
@@ -232,21 +232,21 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         agent_flat(agent, agent_array);
 
         // single
-//        for (int i = 0; i < POP_SIZE; i++) {
-//            env.reset();
-//            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
-//        }
+        for (int i = 0; i < POP_SIZE; i++) {
+            env.reset();
+            evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+        }
 
         // parallel
-        taskflow.clear();
-        for (int i = 0; i < POP_SIZE; i++) {
-            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
-                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
-            });
-            item.name(std::to_string(i));
-        }
-        executor.run(taskflow);
-        executor.wait_for_all();
+//        taskflow.clear();
+//        for (int i = 0; i < POP_SIZE; i++) {
+//            auto item = taskflow.emplace([i, env, pop, &agent_array, &fit, &sim]() {
+//                evaluate(env, pop[i], agent_array, fit[i], sim[i]);
+//            });
+//            item.name(std::to_string(i));
+//        }
+//        executor.run(taskflow);
+//        executor.wait_for_all();
 
         // Multi-processor Scheduling
 //        if (gen == 0) {
@@ -271,26 +271,27 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
         // rank mode
         double fit_rate, sim_rate;
 
-        // original method
-        fit_rate = 1; sim_rate = 0;
-
-        // improved method
-//        if (f_a[gen] > fit_lgar || sim_a[gen] > 0.5) {
-//            fit_rate = 1;
-//            sim_rate = 0;
-//        } else {
-//            if (fit[indi_best] >= agent.top().second) {
-//                fit_rate = 0.7;
-//                sim_rate = 0.3;
-//            } else {
-//                fit_rate = 0.5;
-//                sim_rate = 0.5;
-//            }
-//        }
-//        fit_lgar = f_a[gen];
+        if (method == "original") {
+            // original method
+            fit_rate = 1; sim_rate = 0;
+        }else {
+            // improved method
+            if (f_a[gen] > fit_lgar || sim_a[gen] > 0.5) {
+                fit_rate = 1;
+                sim_rate = 0;
+            } else {
+                if (fit[indi_best] >= agent.top().second) {
+                    fit_rate = 0.7;
+                    sim_rate = 0.3;
+                } else {
+                    fit_rate = 0.5;
+                    sim_rate = 0.5;
+                }
+            }
+            fit_lgar = f_a[gen];
+        }
 
         // get rank
-        // rank
         vector<double> rank;
         get_rank1(rank, fit, sim, fit_rate, sim_rate);
 
@@ -333,10 +334,6 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
                      gen, f_a[gen], f_b[gen], f_ens[gen], agent_array[0].second, agent_array[T_S - 1].second,
                      siz_a[gen], sim_a[gen], fit_rate);
 
-        result[gen].f_a += f_a[gen];
-        result[gen].f_b += f_b[gen];
-        result[gen].f_ens += f_ens[gen];
-
         if ((gen+1) % 50 == 0) model_save(_pre, agent);
     }
 
@@ -345,25 +342,6 @@ void rl::rl_op(const int seed, const std::string & _pre, double &succ_rate, std:
     for (int i = 0; i < MAX_GENERATION; i++)
         _file << i << " " << f_a[i] << " " << f_b[i] << " " << f_ens[i] << " " << siz_a[i] << " " << sim_a[i] << endl;
     _file.close();
-
-//    // print
-//    py::object _b_i = py::cast(f_b);
-//    py::object _f_ens = py::cast(f_ens);
-//    py::object _f_a = py::cast(f_a);
-//    py::object _siz_a = py::cast(siz_a);
-//
-//    py::object plt = py::module::import("matplotlib.pyplot");
-//    plt.attr("figure")();
-//    plt.attr("subplot")(411);
-//    plt.attr("plot")(_b_i);
-//    plt.attr("subplot")(412);
-//    plt.attr("plot")(_f_ens);
-//    plt.attr("subplot")(413);
-//    plt.attr("plot")(_f_a);
-//    plt.attr("subplot")(414);
-//    plt.attr("plot")(_siz_a);
-//    plt.attr("yscale")("log");
-//    plt.attr("show")();
 
     for (int i = 0; i < POP_SIZE; i++)
         individual::indi_clean(pop[i]);

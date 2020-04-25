@@ -3,6 +3,8 @@ project(GPRL_CPP)
 
 set(CMAKE_CXX_STANDARD 17)
 
+include_directories(/usr/local/include/)
+
 find_package(pybind11)
 
 find_package(spdlog)
