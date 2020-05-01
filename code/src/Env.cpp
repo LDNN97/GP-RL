@@ -57,16 +57,16 @@ std::tuple<std::array<double, 2>, double, bool> MountainCar::step(double action)
 // CartPole
 CartPole::CartPole(const int seed) {
     arma_rng::set_seed(seed);
-    vec delta = {-0.05, -0.05, -0.05, -0.05};
-    state_ini = delta + 0.1 * randu(4);
+    vec delta = {-1, -1, -1, -1};
+    state_ini = delta + 2 * randu(4);
     state = state_ini;
     state_last = state;
     t = 0; t_last = 0;
 }
 
 void CartPole::reset_ini() {
-    vec delta = {-0.05, -0.05, -0.05, -0.05};
-    state_ini = delta + 0.1 * randu(4);
+    vec delta = {-1, -1, -1, -1};
+    state_ini = delta + 2 * randu(4);
 }
 
 void CartPole::reset() {
@@ -83,7 +83,7 @@ std::tuple<std::array<double, 4>, double, bool> CartPole::step(double action) {
     double g = 9.8, m_c = 1.0, m_p = 0.1, m_total = m_c + m_p;
     double l = 0.5, m_p_l = m_p * l, force_mag = 10, dt = 0.02;
     int t_limit = 1000;
-    double x_threshold = 2.4, theta_threshold = 12 * 2 * datum::pi / 360;
+    double x_threshold = 2.4, theta_threshold = 60 * 2 * datum::pi / 360;
 
     double force = -force_mag + 20 * action;
 
