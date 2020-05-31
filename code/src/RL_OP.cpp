@@ -65,7 +65,7 @@ void evaluate(env_class env, const individual* indi, const vector<agent_pair> &a
     env.reset();
     int cnt = 0; bool always_same = true;
     double _fit = 0, _sim = 0;
-    for (int step = 0; step < 500; step++){
+    for (int step = 0; step < 1000; step++){
         cnt++;
         action = get_max_action(env, indi);
 
@@ -93,7 +93,7 @@ void evaluate_ens(env_class &env, const vector<agent_pair> &agent, double &fit_e
 
     env.reset();
     double _fit_ens = 0;
-    for (int step = 0; step < 500; step++){
+    for (int step = 0; step < 1000; step++){
         action = rl::ensemble_selection(env, agent);
         auto [nst, reward, end] = env.step(action_set[action]);
         _fit_ens += reward;

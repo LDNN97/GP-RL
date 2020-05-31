@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
     if (*_mode == "display") {
         int exp_id = !_exp_id ? 0 : *_exp_id;
-        int indi = !_seed ? -1 : *_indi;
+        int indi = !_indi ? -1 : *_indi;
 
         rl::ensemble_agent(exp_id, indi);
 

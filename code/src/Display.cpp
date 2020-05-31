@@ -60,21 +60,21 @@ void rl::ensemble_agent(int ID, int ind) {
     _pre += " ";
 
     int ensemble_size = 0;
-    ifstream _file("Agent/" + _pre + "ensemble_size.txt");
+    ifstream _file("Result/" + _pre + "ensemble_size.txt");
     _file >> ensemble_size;
     _file.close();
 
     vector<individual*> agent;
     if (ind == -1) {
         for (int i = 0; i < ensemble_size; i++) {
-            string _f_name = "Agent/" + _pre + "agent.txt";
+            string _f_name = "Result/" + _pre + "agent.txt";
             string _f_num = std::to_string(i);
             _f_name.insert(_f_name.length() - 4, _f_num);
             individual* indi = individual::load_indi(_f_name);
             agent.emplace_back(indi);
         }
     }else {
-        string _f_name = "Agent/" + _pre + "agent.txt";
+        string _f_name = "Result/" + _pre + "agent.txt";
         string _f_num = std::to_string(ind);
         _f_name.insert(_f_name.length() - 4, _f_num);
         individual* indi = individual::load_indi(_f_name);
